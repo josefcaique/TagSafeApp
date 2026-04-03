@@ -1,20 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
     android:background="@color/background">
 
-
-
-    <LinearLayout
+    <ScrollView
+        android:id="@+id/mainScrollView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        tools:context=".MainActivity">
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:background="@color/background">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            tools:context=".MainActivity">
 
 
         <!-- Toolbar -->
@@ -22,32 +27,25 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/turquoise"
-            android:elevation="4dp"
-            app:titleTextColor="@color/white"
+            android:layout_marginBottom="16dp"
+            android:background="@color/background"
+            android:elevation="0dp"
+            app:logo="@mipmap/ic_launcher_round"
+            app:contentInsetStart="0dp"
+            app:contentInsetStartWithNavigation="0dp"
+            app:titleTextColor="@color/turquoise"
             app:menu="@menu/menu_main"
-            app:title="YouSafe" />
+            app:title="TagSafe" />
 
-        <!-- Logo -->
-        <ImageView
-            android:layout_width="200dp"
-            android:layout_height="80dp"
-            android:src="@drawable/logo_empresa1"
-            android:scaleType="centerInside"
-            android:layout_gravity="center"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="32dp" />
-
-        <!-- Header com boas-vindas -->
         <TextView
             android:id="@+id/textViewBemVindo"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
             android:text="Olá, Professor!"
-            android:textSize="28sp"
-            android:textStyle="bold"
             android:textColor="@color/text_primary"
-            android:layout_marginBottom="32dp" />
+            android:textSize="28sp"
+            android:textStyle="bold" />
 
         <!-- ========================================== -->
         <!-- ESTADO 1: CRIAÇÃO DE AULA -->
@@ -68,33 +66,34 @@
                 android:padding="24dp">
 
                 <TextView
+                    android:id="@+id/textViewTituloCriacao"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Nova Aula"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
+                    android:layout_marginBottom="24dp"
+                    android:text="Nova Atividade"
                     android:textColor="@color/text_primary"
-                    android:layout_marginBottom="24dp" />
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
 
                 <!-- Seleção de Empresa -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
                     android:text="Empresa"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
                     android:textColor="@color/text_secondary"
-                    android:layout_marginBottom="8dp" />
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="20dp"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                    app:boxCornerRadiusTopStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp"
-                    app:boxCornerRadiusBottomStart="12dp"
                     app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
                     app:boxStrokeColor="@color/turquoise"
                     app:startIconDrawable="@drawable/ic_business"
                     app:startIconTint="@color/turquoise">
@@ -104,8 +103,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="none"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_primary" />
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -113,21 +112,22 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
                     android:text="Unidade"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
                     android:textColor="@color/text_secondary"
-                    android:layout_marginBottom="8dp" />
+                    android:textSize="14sp" 
+                    android:textStyle="bold" />
 
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/layoutSpinnerUnidade"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="20dp"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                    app:boxCornerRadiusTopStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp"
-                    app:boxCornerRadiusBottomStart="12dp"
                     app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
                     app:boxStrokeColor="@color/turquoise"
                     app:startIconDrawable="@drawable/ic_location"
                     app:startIconTint="@color/turquoise">
@@ -136,47 +136,130 @@
                         android:id="@+id/spinnerUnidade"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="none"
                         android:enabled="false"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_primary" />
+                        android:inputType="none"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Descrição da Aula -->
+                <!-- Selecao modulo -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Descrição da aula"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"
+                    android:text="Modulo"
                     android:textColor="@color/text_secondary"
-                    android:layout_marginBottom="8dp" />
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/layoutSpinnerModule"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="20dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxStrokeColor="@color/turquoise"
+                    app:startIconDrawable="@drawable/ic_description"
+                    app:startIconTint="@color/turquoise">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/spinnerModule"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:enabled="false"
+                        android:inputType="none"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Campos de Treinamento -->
+                <LinearLayout
+                    android:id="@+id/layoutTreinamentoFields"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:text="Nome do treinamento"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="20dp"
+                        app:boxCornerRadiusBottomEnd="12dp"
+                        app:boxCornerRadiusBottomStart="12dp"
+                        app:boxCornerRadiusTopEnd="12dp"
+                        app:boxCornerRadiusTopStart="12dp"
+                        app:boxStrokeColor="@color/turquoise"
+                        app:endIconMode="dropdown_menu"
+                        app:startIconDrawable="@drawable/ic_description"
+                        app:startIconTint="@color/turquoise">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editTextNomeTreinamento"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:completionThreshold="1"
+                            android:hint="Ex: NR-35"
+                            android:inputType="textCapWords"
+                            android:maxLength="80"
+                            android:textColor="@color/text_primary"
+                            android:textSize="16sp" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <!-- Descrição -->
+                <TextView
+                    android:id="@+id/textViewDescricaoLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Descrição"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/layoutDescricaoAula"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="24dp"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    app:boxCornerRadiusTopStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp"
-                    app:boxCornerRadiusBottomStart="12dp"
+                    android:visibility="gone"
                     app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
                     app:boxStrokeColor="@color/turquoise"
-                    app:startIconDrawable="@drawable/ic_description"
-                    app:startIconTint="@color/turquoise"
                     app:counterEnabled="true"
-                    app:counterMaxLength="100">
+                    app:counterMaxLength="100"
+                    app:startIconDrawable="@drawable/ic_description"
+                    app:startIconTint="@color/turquoise">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/editTextDescricaoAula"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Ex: Alongamento para equipe de TI"
                         android:inputType="textCapSentences"
                         android:maxLength="100"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_primary" />
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -184,16 +267,13 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonIniciarAula"
                     android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:text="Iniciar Aula"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    app:icon="@drawable/ic_play"
-                    app:iconGravity="textStart"
-                    app:iconSize="24dp"
-                    app:cornerRadius="16dp"
-                    app:backgroundTint="@color/turquoise"
+                    android:layout_height="60dp"
+                    android:text="Iniciar atividade"
                     android:textColor="@color/white"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/turquoise"
+                    app:cornerRadius="16dp"
                     app:elevation="6dp" />
 
             </LinearLayout>
@@ -303,33 +383,6 @@
 
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Contador de Participantes -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:layout_marginBottom="24dp">
-
-                    <TextView
-                        android:id="@+id/textViewContador"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textSize="72sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/turquoise"
-                        android:layout_marginBottom="8dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="participantes registrados"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_secondary" />
-
-                </LinearLayout>
-
                 <!-- Lista de NFCs Lidos -->
                 <TextView
                     android:layout_width="match_parent"
@@ -346,12 +399,16 @@
                     app:cardElevation="0dp"
                     app:cardCornerRadius="12dp"
                     app:cardBackgroundColor="@color/surface_variant"
-                    android:layout_marginBottom="24dp">
+                    android:layout_marginBottom="12dp">
 
                     <ScrollView
                         android:layout_width="match_parent"
-                        android:layout_height="180dp"
-                        android:padding="16dp">
+                        android:layout_height="220dp"
+                        android:padding="16dp"
+                        android:fadeScrollbars="false"
+                        android:scrollbarThumbVertical="@color/turquoise"
+                        android:scrollbars="vertical"
+                        android:nestedScrollingEnabled="true">
 
                         <TextView
                             android:id="@+id/textViewListaNFCs"
@@ -366,6 +423,16 @@
 
                 </com.google.android.material.card.MaterialCardView>
 
+                <TextView
+                    android:id="@+id/textViewContador"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Participantes registrados: 0"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginBottom="24dp"
+                    android:gravity="center" />
+
                 <!-- Botões de Ação -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonConfirmarAula"
@@ -374,9 +441,6 @@
                     android:text="Confirmar Aula"
                     android:textSize="18sp"
                     android:textStyle="bold"
-                    app:icon="@drawable/ic_check"
-                    app:iconGravity="textStart"
-                    app:iconSize="24dp"
                     app:cornerRadius="16dp"
                     app:backgroundTint="@color/turquoise"
                     android:textColor="@color/white"
@@ -389,20 +453,44 @@
                     android:text="Abortar Aula"
                     android:textSize="18sp"
                     android:textStyle="bold"
-                    app:icon="@drawable/ic_close"
-                    app:iconGravity="textStart"
-                    app:iconSize="24dp"
                     app:cornerRadius="16dp"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     app:strokeColor="@color/error"
                     app:strokeWidth="2dp"
-                    android:textColor="@color/error"
-                    app:iconTint="@color/error" />
+                    android:textColor="@color/error" />
+
+                <TextView
+                    android:id="@+id/textViewDuracaoAula"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Duração: 00:00:00"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:gravity="center" />
+
+                <TextView
+                    android:id="@+id/textViewAvisoAula"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="A atividade permanecerá aberta até o encerramento manual, permitindo assim a contabilização das horas"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:gravity="center" />
 
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
 
-    </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
 
-</ScrollView>
+    <View
+        android:id="@+id/statusBarScrim"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_gravity="top"
+        android:background="@color/turquoise" />
+
+</FrameLayout>

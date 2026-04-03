@@ -1,17 +1,15 @@
 package com.digitalsix.YouSafe.network
 
+import com.digitalsix.YouSafe.network.modulos.moduloResponse
 import com.google.gson.annotations.SerializedName
 
 /**
  * Modelo para resposta do endpoint GET /empresas
- * Representa uma unidade com seus dados de empresa
+ * Representa uma unidade com seus dados de empresa e módulos disponíveis
  */
 data class EmpresaUnidadeResponse(
     @SerializedName("unidade_id")
     val unidadeId: Int,
-
-    @SerializedName("empresa_id")
-    val empresaId: Int,
 
     @SerializedName("nome")
     val nomeEmpresa: String,
@@ -20,7 +18,10 @@ data class EmpresaUnidadeResponse(
     val nomeUnidade: String,
 
     @SerializedName("cnpj")
-    val cnpj: String
+    val cnpj: String?,
+
+    @SerializedName("modulos")
+    val modulos: List<moduloResponse>
 )
 
 /**

@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/loginScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
+    android:clipToPadding="false"
     android:background="#f5f5f5">
 
     <LinearLayout
@@ -16,16 +18,16 @@
 
         <!-- Logo/Título -->
         <ImageView
-            android:layout_width="200dp"
-            android:layout_height="80dp"
-            android:src="@drawable/logo_empresa1"
+            android:layout_width="240dp"
+            android:layout_height="100dp"
+            android:src="@drawable/logo_tagsafe"
             android:scaleType="centerInside"
             android:layout_marginBottom="8dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Sistema de Controle de Presença"
+            android:text="Presença com segurança"
             android:textSize="16sp"
             android:textColor="#666666"
             android:layout_marginBottom="48dp" />
@@ -43,7 +45,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Login do Professor"
+                android:text="Acesso à plataforma"
                 android:textSize="24sp"
                 android:textStyle="bold"
                 android:textColor="#333333"
@@ -85,7 +87,30 @@
                 android:inputType="textPassword"
                 android:padding="12dp"
                 android:background="@drawable/edittext_focused"
-                android:layout_marginBottom="24dp" />
+                android:layout_marginBottom="8dp" />
+
+            <!-- Esqueci minha senha -->
+            <TextView
+                android:id="@+id/textViewForgotPassword"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:text="Esqueci minha senha"
+                android:textColor="@color/turquoise"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:paddingBottom="16dp" />
+
+            <TextView
+                android:id="@+id/textViewLoginError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#B00020"
+                android:background="#FCE9E9"
+                android:padding="12dp"
+                android:textSize="14sp"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
 
             <!-- Botão Login -->
             <Button

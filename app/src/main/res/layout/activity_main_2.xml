@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/background">
+
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp"
+        tools:context=".MainActivity">
+
+
+        <!-- Toolbar -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/turquoise"
+            android:elevation="4dp"
+            app:titleTextColor="@color/white"
+            app:menu="@menu/menu_main"
+            app:title="YouSafe" />
+
+        <!-- Logo -->
+        <ImageView
+            android:layout_width="200dp"
+            android:layout_height="80dp"
+            android:src="@drawable/logo_empresa2"
+            android:scaleType="centerInside"
+            android:layout_gravity="center"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="32dp" />
+
+        <!-- Header com boas-vindas -->
+        <TextView
+            android:id="@+id/textViewBemVindo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Olá, Professor!"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="32dp" />
+
+        <!-- ========================================== -->
+        <!-- ESTADO 1: CRIAÇÃO DE AULA -->
+        <!-- ========================================== -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/layoutCriacaoAula"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="20dp"
+            app:cardBackgroundColor="@color/surface"
+            android:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="550dp"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:text="Nova Aula"
+                    android:textColor="@color/text_primary"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <!-- Seleção de Empresa -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Empresa"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="20dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxStrokeColor="@color/turquoise"
+                    app:startIconDrawable="@drawable/ic_business"
+                    app:startIconTint="@color/turquoise">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/spinnerEmpresa"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Seleção de Unidade -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Unidade"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="20dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxStrokeColor="@color/turquoise"
+                    app:startIconDrawable="@drawable/ic_location"
+                    app:startIconTint="@color/turquoise">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/spinnerUnidade"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:enabled="false"
+                        android:inputType="none"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Descrição da Aula -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Descrição da aula"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxStrokeColor="@color/turquoise"
+                    app:counterEnabled="true"
+                    app:counterMaxLength="100"
+                    app:startIconDrawable="@drawable/ic_description"
+                    app:startIconTint="@color/turquoise">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextDescricaoAula"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Ex: Alongamento para equipe de TI"
+                        android:inputType="textCapSentences"
+                        android:maxLength="100"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Botão Iniciar Aula -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonIniciarAula"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:text="Iniciar Aula"
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/turquoise"
+                    app:cornerRadius="16dp"
+                    app:elevation="6dp"
+                    app:icon="@drawable/ic_play"
+                    app:iconGravity="textStart"
+                    app:iconSize="24dp" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ========================================== -->
+        <!-- ESTADO 2: LEITURA DE NFC -->
+        <!-- ========================================== -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/layoutLeituraNFC"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="20dp"
+            app:cardBackgroundColor="@color/surface"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:gravity="center_horizontal">
+
+                <!-- Header da Aula em Andamento -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:layout_marginBottom="24dp">
+
+                    <TextView
+                        android:id="@+id/textViewAulaEmAndamento"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Aula em Progresso"
+                        android:textSize="24sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/turquoise"
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:id="@+id/textViewDescricaoAtual"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Alongamento para equipe de TI"
+                        android:textSize="16sp"
+                        android:textColor="@color/text_secondary"
+                        android:textAlignment="center"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/textViewUnidadeAtual"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Unidade: BASF - Planta 1"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_tertiary"
+                        android:textAlignment="center" />
+
+                </LinearLayout>
+
+                <!-- Card de Instrução NFC -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardBackgroundColor="@color/turquoise_light"
+                    app:strokeWidth="2dp"
+                    app:strokeColor="@color/turquoise"
+                    android:layout_marginBottom="32dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="32dp"
+                        android:gravity="center">
+
+                        <ImageView
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
+                            android:src="@drawable/ic_nfc"
+                            app:tint="@color/turquoise"
+                            android:layout_marginBottom="16dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Aproxime o crachá NFC"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/turquoise"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="para registrar presença"
+                            android:textSize="16sp"
+                            android:textColor="@color/text_secondary" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Contador de Participantes -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:layout_marginBottom="24dp">
+
+                    <TextView
+                        android:id="@+id/textViewContador"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="72sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/turquoise"
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="participantes registrados"
+                        android:textSize="16sp"
+                        android:textColor="@color/text_secondary" />
+
+                </LinearLayout>
+
+                <!-- Lista de NFCs Lidos -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="IDs Registrados"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginBottom="12dp" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardBackgroundColor="@color/surface_variant"
+                    android:layout_marginBottom="24dp">
+
+                    <ScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="180dp"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:id="@+id/textViewListaNFCs"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Nenhum crachá lido ainda."
+                            android:textSize="14sp"
+                            android:fontFamily="monospace"
+                            android:textColor="@color/text_secondary" />
+
+                    </ScrollView>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Botões de Ação -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonConfirmarAula"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Confirmar Aula"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    app:icon="@drawable/ic_check"
+                    app:iconGravity="textStart"
+                    app:iconSize="24dp"
+                    app:cornerRadius="16dp"
+                    app:backgroundTint="@color/turquoise"
+                    android:textColor="@color/white"
+                    android:layout_marginBottom="12dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonAbortarAula"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="Abortar Aula"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    app:icon="@drawable/ic_close"
+                    app:iconGravity="textStart"
+                    app:iconSize="24dp"
+                    app:cornerRadius="16dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    app:strokeColor="@color/error"
+                    app:strokeWidth="2dp"
+                    android:textColor="@color/error"
+                    app:iconTint="@color/error" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+
+</ScrollView>

@@ -2,757 +2,798 @@ package com.digitalsix.YouSafe
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Rect
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import android.view.View
-import android.widget.*
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import com.digitalsix.YouSafe.network.*
-import com.digitalsix.YouSafe.utils.SessionManager
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import androidx.lifecycle.ViewModelProvider
+import kotlin.math.max
+import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.RetrofitInstance
-import com.google.android.material.textfield.TextInputEditText
+import com.digitalsix.YouSafe.network.modulos.moduloResponse
+import com.digitalsix.YouSafe.repository.MainRepository
+import com.digitalsix.YouSafe.utils.SessionManager
+import com.digitalsix.YouSafe.viewmodel.AcaoState
+import com.digitalsix.YouSafe.viewmodel.MainViewModel
+import com.digitalsix.YouSafe.viewmodel.MainViewModelFactory
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
-
-// ==========================================
-// DATA CLASS PARA PARTICIPANTE COM STATUS
-// ==========================================
-data class ParticipanteComStatus(
-    val nfc: String,
-    val funcionarioId: Int?,
-    val nome: String?,
-    val existe: Boolean
-)
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
+import java.text.SimpleDateFormat
+import java.util.ArrayDeque
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 class MainActivity : AppCompatActivity() {
 
-    // ==========================================
-    // PROPRIEDADES
-    // ==========================================
+    private lateinit var viewModel: MainViewModel
     private lateinit var sessionManager: SessionManager
     private var nfcAdapter: NfcAdapter? = null
 
-    // Estado 1 - Criação de Aula
+    private lateinit var mainScrollView: ScrollView
+    private lateinit var statusBarScrim: View
+
+    // Views — Estado 1: Criação de Aula
+    private lateinit var toolbar: MaterialToolbar
+    private lateinit var textViewBemVindo: TextView
     private lateinit var layoutCriacaoAula: MaterialCardView
     private lateinit var spinnerEmpresa: AutoCompleteTextView
     private lateinit var spinnerUnidade: AutoCompleteTextView
+    private lateinit var layoutSpinnerUnidade: TextInputLayout
+    private lateinit var spinnerModule: AutoCompleteTextView
+    private lateinit var layoutSpinnerModule: TextInputLayout
+    private lateinit var layoutTreinamentoFields: LinearLayout
+    private lateinit var editTextNomeTreinamento: AutoCompleteTextView
+    private lateinit var textViewDescricaoLabel: TextView
+    private lateinit var layoutDescricaoAula: TextInputLayout
     private lateinit var editTextDescricaoAula: TextInputEditText
-    private lateinit var buttonIniciarAula: Button
-    private lateinit var textViewBemVindo: TextView
+    private lateinit var buttonIniciarAula: MaterialButton
 
-    private var ultimaLeituraNFC: Long = 0
-    private val DEBOUNCE_DELAY_MS = 1000L
-
-    // Estado 2 - Leitura NFC
+    // Views — Estado 2: Leitura NFC
     private lateinit var layoutLeituraNFC: MaterialCardView
-    private lateinit var textViewAulaEmAndamento: TextView
     private lateinit var textViewDescricaoAtual: TextView
     private lateinit var textViewUnidadeAtual: TextView
-    private lateinit var textViewContador: TextView
     private lateinit var textViewListaNFCs: TextView
-    private lateinit var buttonConfirmarAula: Button
-    private lateinit var buttonAbortarAula: Button
+    private lateinit var textViewContador: TextView
+    private lateinit var buttonConfirmarAula: MaterialButton
+    private lateinit var buttonAbortarAula: MaterialButton
+    private lateinit var textViewDuracaoAula: TextView
 
-    // ✅ Controle de Empresas e Unidades
-    private var todasUnidadesDoInstrutor = listOf<EmpresaUnidadeResponse>()
-    private var empresasMap = mapOf<String, EmpresaComUnidades>()  // empresa_nome -> dados
-    private var empresaSelecionadaNome: String? = null
+    // Estado interno
+    private var empresaSelecionada: EmpresaComUnidades? = null
     private var unidadeIdSelecionada: Int? = null
+    private var moduloSelecionado: moduloResponse? = null
+    private var tipoModuloAtual: TipoModulo = TipoModulo.DESCONHECIDO
+    private var sessaoId: Int? = null
+    private val participantes = mutableListOf<ParticipanteSessao>()
+    private val nfcsRegistrados = mutableListOf<String>()
+    private var aulaInicioMs: Long = 0L
+    private var empresasPopuladas = false
+    private var nfcPendente: String? = null
+    private val filaNfcsPendentes = ArrayDeque<String>()
+    private var exibirLogoutNoMenu: Boolean = true
 
-    // Controle de Estado
-    private var aulaEmProgressoId: Int? = null
-    private var descricaoAulaAtual: String = ""
+    private val timerHandler = Handler(Looper.getMainLooper())
+    private var timerRunnable: Runnable? = null
 
-    private val listaParticipantes = mutableListOf<ParticipanteComStatus>()
-
-    // ==========================================
-    // DATA CLASSES AUXILIARES
-    // ==========================================
-    data class EmpresaComUnidades(
-        val empresaNome: String,
-        val empresaId: Int,
-        val unidades: List<UnidadeInfo>
-    )
-
-    data class UnidadeInfo(
-        val unidadeId: Int,
-        val unidadeNome: String
-    )
-
-    // ==========================================
-    // LIFECYCLE
-    // ==========================================
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        configurarBarraStatus()
 
         sessionManager = SessionManager(this)
+        val repository = MainRepository(RetrofitInstance.api)
+        val factory = MainViewModelFactory(repository)
+        viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
-        if (!sessionManager.isLoggedIn()) {
+        inicializarViews()
+        configurarTeclado()
+        configurarToolbar()
+        configurarDropdowns()
+        configurarBotoes()
+        observarViewModel()
+
+        nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+
+        val usuario = sessionManager.getUsuario()
+        val token = sessionManager.getTokenWithBearer()
+        if (usuario != null && token != null) {
+            textViewBemVindo.text = "Olá, ${usuario.nome}!"
+            val instrutorId = usuario.instrutorId ?: run {
+                Toast.makeText(this, "Usuário não possui perfil de instrutor.", Toast.LENGTH_SHORT).show()
+                irParaLogin()
+                return
+            }
+            viewModel.carregarEmpresasEUnidades(token, instrutorId)
+        } else {
             irParaLogin()
             return
         }
 
-        // Configurar Toolbar
-        val toolbar = findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
+        verificarAulaEmProgresso()
+    }
+
+    // ==========================================
+    // INICIALIZAÇÃO
+    // ==========================================
+
+    private fun inicializarViews() {
+        mainScrollView = findViewById(R.id.mainScrollView)
+        statusBarScrim = findViewById(R.id.statusBarScrim)
+        toolbar = findViewById(R.id.toolbar)
+        textViewBemVindo = findViewById(R.id.textViewBemVindo)
+        layoutCriacaoAula = findViewById(R.id.layoutCriacaoAula)
+        spinnerEmpresa = findViewById(R.id.spinnerEmpresa)
+        spinnerUnidade = findViewById(R.id.spinnerUnidade)
+        layoutSpinnerUnidade = findViewById(R.id.layoutSpinnerUnidade)
+        spinnerModule = findViewById(R.id.spinnerModule)
+        layoutSpinnerModule = findViewById(R.id.layoutSpinnerModule)
+        layoutTreinamentoFields = findViewById(R.id.layoutTreinamentoFields)
+        editTextNomeTreinamento = findViewById(R.id.editTextNomeTreinamento)
+        textViewDescricaoLabel = findViewById(R.id.textViewDescricaoLabel)
+        layoutDescricaoAula = findViewById(R.id.layoutDescricaoAula)
+        editTextDescricaoAula = findViewById(R.id.editTextDescricaoAula)
+        buttonIniciarAula = findViewById(R.id.buttonIniciarAula)
+        layoutLeituraNFC = findViewById(R.id.layoutLeituraNFC)
+        textViewDescricaoAtual = findViewById(R.id.textViewDescricaoAtual)
+        textViewUnidadeAtual = findViewById(R.id.textViewUnidadeAtual)
+        textViewListaNFCs = findViewById(R.id.textViewListaNFCs)
+        textViewContador = findViewById(R.id.textViewContador)
+        buttonConfirmarAula = findViewById(R.id.buttonConfirmarAula)
+        buttonAbortarAula = findViewById(R.id.buttonAbortarAula)
+        textViewDuracaoAula = findViewById(R.id.textViewDuracaoAula)
+    }
+
+    private fun configurarToolbar() {
         setSupportActionBar(toolbar)
-
-        bindViews()
-        configurarNFC()
-        carregarEmpresasEUnidades()
-        configurarListeners()
-        verificarAulaEmAndamento()
     }
 
-    override fun onResume() {
-        super.onResume()
-        habilitarLeituraNFC()
+    private fun configurarBarraStatus() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = false
     }
 
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+    private fun configurarTeclado() {
+        ViewCompat.setOnApplyWindowInsetsListener(mainScrollView) { view, insets ->
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val systemBarsInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            statusBarScrim.layoutParams = statusBarScrim.layoutParams.apply {
+                height = systemBarsInsets.top
+            }
+            val extraTop = (8 * resources.displayMetrics.density).toInt()
+            val topPadding = systemBarsInsets.top + extraTop
+            val bottomPadding = max(imeInsets.bottom, systemBarsInsets.bottom)
+            view.updatePadding(top = topPadding, bottom = bottomPadding)
+            if (insets.isVisible(WindowInsetsCompat.Type.ime())) {
+                currentFocus?.let { focused ->
+                    view.post { garantirVisibilidadeDoFoco(focused) }
+                }
+            }
+            insets
+        }
+        ViewCompat.requestApplyInsets(mainScrollView)
+
+        val scrollParaFoco = View.OnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                view.post { garantirVisibilidadeDoFoco(view) }
+            }
+        }
+        editTextNomeTreinamento.onFocusChangeListener = scrollParaFoco
+        editTextDescricaoAula.onFocusChangeListener = scrollParaFoco
+    }
+
+    private fun garantirVisibilidadeDoFoco(target: View) {
+        if (!isDescendenteDe(target, mainScrollView)) return
+
+        val rect = Rect()
+        target.getDrawingRect(rect)
+        mainScrollView.offsetDescendantRectToMyCoords(target, rect)
+
+        val extra = (24 * resources.displayMetrics.density).toInt()
+        val visibleTop = mainScrollView.scrollY + mainScrollView.paddingTop
+        val visibleBottom = mainScrollView.scrollY + mainScrollView.height - mainScrollView.paddingBottom
+
+        when {
+            rect.bottom + extra > visibleBottom ->
+                mainScrollView.smoothScrollBy(0, rect.bottom + extra - visibleBottom)
+            rect.top - extra < visibleTop ->
+                mainScrollView.smoothScrollBy(0, rect.top - extra - visibleTop)
+        }
+    }
+
+    private fun isDescendenteDe(child: View, parent: View): Boolean {
+        var current: View? = child
+        while (current != null && current != parent) {
+            current = current.parent as? View
+        }
+        return current == parent
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
+        menu.findItem(R.id.action_logout)?.isVisible = exibirLogoutNoMenu
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_logout -> {
-                fazerLogout()
+                confirmarLogout()
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        desabilitarLeituraNFC()
-    }
-
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        if (NfcAdapter.ACTION_TAG_DISCOVERED == intent?.action) {
-            val tag: Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
-            tag?.let { processarTagNFC(it) }
-        }
-    }
-
-    // ==========================================
-    // INICIALIZAÇÃO
-    // ==========================================
-    private fun bindViews() {
-        layoutCriacaoAula = findViewById(R.id.layoutCriacaoAula)
-        spinnerEmpresa = findViewById(R.id.spinnerEmpresa)
-        spinnerUnidade = findViewById(R.id.spinnerUnidade)
-        editTextDescricaoAula = findViewById(R.id.editTextDescricaoAula)
-        buttonIniciarAula = findViewById(R.id.buttonIniciarAula)
-        textViewBemVindo = findViewById(R.id.textViewBemVindo)
-
-        layoutLeituraNFC = findViewById(R.id.layoutLeituraNFC)
-        textViewAulaEmAndamento = findViewById(R.id.textViewAulaEmAndamento)
-        textViewDescricaoAtual = findViewById(R.id.textViewDescricaoAtual)
-        textViewUnidadeAtual = findViewById(R.id.textViewUnidadeAtual)
-        textViewContador = findViewById(R.id.textViewContador)
-        textViewListaNFCs = findViewById(R.id.textViewListaNFCs)
-        buttonConfirmarAula = findViewById(R.id.buttonConfirmarAula)
-        buttonAbortarAula = findViewById(R.id.buttonAbortarAula)
-
-        val nomeUsuario = sessionManager.getNomeUsuario()
-        textViewBemVindo.text = "Olá, $nomeUsuario!"
-    }
-
-    private fun fazerLogout() {
+    private fun confirmarLogout() {
         AlertDialog.Builder(this)
             .setTitle("Sair")
             .setMessage("Deseja realmente sair?")
-            .setPositiveButton("Sim") { _, _ ->
+            .setPositiveButton("Sair") { _, _ ->
                 sessionManager.clearSession()
-                val intent = Intent(this, LoginActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-                finish()
+                irParaLogin()
             }
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
-    private fun configurarNFC() {
-        nfcAdapter = NfcAdapter.getDefaultAdapter(this)
-
-        if (nfcAdapter == null) {
-            Toast.makeText(this, "❌ Dispositivo não suporta NFC", Toast.LENGTH_LONG).show()
-            finish()
-            return
-        }
-
-        if (nfcAdapter?.isEnabled == false) {
-            Toast.makeText(this, "⚠️ NFC desabilitado. Ative nas configurações.", Toast.LENGTH_LONG).show()
-        }
-    }
-
     // ==========================================
-    // ✅ CARREGAR E FILTRAR EMPRESAS/UNIDADES
+    // DROPDOWNS
     // ==========================================
-    private fun carregarEmpresasEUnidades() {
-        lifecycleScope.launch {
-            try {
-                Log.d("MainActivity", "🔄 Carregando empresas e unidades...")
 
-                // 1. Pegar unidades que o instrutor atende (do login)
-                val usuario = sessionManager.getUsuario()
-                val unidadesAtendidasDoLogin = usuario?.unidadesAtendidas ?: emptyList()
+    private fun configurarDropdowns() {
+        spinnerEmpresa.setOnClickListener { spinnerEmpresa.showDropDown() }
+        spinnerEmpresa.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus -> if (hasFocus) spinnerEmpresa.showDropDown() }
 
-                if (unidadesAtendidasDoLogin.isEmpty()) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "❌ Você não tem unidades atribuídas",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return@launch
-                }
+        layoutSpinnerUnidade.setOnClickListener { spinnerUnidade.showDropDown() }
+        spinnerUnidade.setOnClickListener { spinnerUnidade.showDropDown() }
+        spinnerUnidade.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus -> if (hasFocus) spinnerUnidade.showDropDown() }
 
-                Log.d("MainActivity", "📋 Unidades do login: ${unidadesAtendidasDoLogin.size}")
-                unidadesAtendidasDoLogin.forEach {
-                    Log.d("MainActivity", "  - ${it.nome} (${it.empresa})")
-                }
+        layoutSpinnerModule.setOnClickListener { spinnerModule.showDropDown() }
+        spinnerModule.setOnClickListener { spinnerModule.showDropDown() }
+        spinnerModule.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus -> if (hasFocus) spinnerModule.showDropDown() }
 
-                // 2. Buscar TODAS as unidades do banco (com empresa_id)
-                val response = RetrofitInstance.api.getEmpresas()
+        spinnerEmpresa.setOnItemClickListener { parent, _, position, _ ->
+            val empresasMap = viewModel.uiState.value?.empresasMap ?: return@setOnItemClickListener
+            val empresaNomeSelecionada = parent.getItemAtPosition(position)?.toString()
+            val empresa = empresaNomeSelecionada?.let { empresasMap[it] }
+                ?: empresasMap.values.elementAtOrNull(position)
+                ?: return@setOnItemClickListener
 
-                if (response.isSuccessful) {
-                    val todasUnidadesDoBanco = response.body() ?: emptyList()
-                    Log.d("MainActivity", "🗄️ Unidades do banco: ${todasUnidadesDoBanco.size}")
+            empresaSelecionada = empresa
+            resetarSelecaoUnidade()
+            resetarSelecaoModulo()
+            popularUnidades(empresa)
+        }
 
-                    // 3. ✅ FILTRAR: só unidades que o instrutor atende
-                    val unidadeIdsDoInstrutor = unidadesAtendidasDoLogin.map { it.id }.toSet()
+        spinnerUnidade.setOnItemClickListener { _, _, position, _ ->
+            val unidades = empresaSelecionada?.unidades ?: return@setOnItemClickListener
+            if (position < unidades.size) {
+                val unidade = unidades[position]
+                unidadeIdSelecionada = unidade.unidadeId
+                resetarSelecaoModulo()
+                carregarModulos(unidade.unidadeId)
+            }
+        }
 
-                    todasUnidadesDoInstrutor = todasUnidadesDoBanco.filter { unidade ->
-                        unidade.unidadeId in unidadeIdsDoInstrutor
-                    }
-
-                    Log.d("MainActivity", "✅ Unidades filtradas: ${todasUnidadesDoInstrutor.size}")
-
-                    if (todasUnidadesDoInstrutor.isEmpty()) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "❌ Erro ao carregar dados das unidades",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        return@launch
-                    }
-
-                    // 4. Agrupar por empresa
-                    processarEmpresasEUnidades()
-                    configurarSpinnerEmpresas()
-
-                } else {
-                    Log.e("MainActivity", "❌ Erro API: ${response.code()}")
-                    Toast.makeText(
-                        this@MainActivity,
-                        "❌ Erro ao carregar unidades: ${response.code()}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            } catch (e: Exception) {
-                Log.e("MainActivity", "❌ Exceção: ${e.message}", e)
-                Toast.makeText(
-                    this@MainActivity,
-                    "❌ Erro: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+        spinnerModule.setOnItemClickListener { _, _, position, _ ->
+            val modulos = viewModel.uiState.value?.modulos ?: return@setOnItemClickListener
+            if (position < modulos.size) {
+                moduloSelecionado = modulos[position]
+                tipoModuloAtual = detectarTipoModulo(modulos[position])
+                atualizarCamposPorTipoModulo()
             }
         }
     }
 
-    private fun processarEmpresasEUnidades() {
-        // Agrupar unidades por empresa_nome (empresa pode ter múltiplas unidades)
-        empresasMap = todasUnidadesDoInstrutor
-            .groupBy { it.nomeEmpresa }
-            .mapValues { (empresaNome, unidades) ->
-                EmpresaComUnidades(
-                    empresaNome = empresaNome,
-                    empresaId = unidades.first().empresaId,  // Todas têm o mesmo empresa_id
-                    unidades = unidades.map {
-                        UnidadeInfo(
-                            unidadeId = it.unidadeId,
-                            unidadeNome = it.nomeUnidade
-                        )
-                    }.sortedBy { it.unidadeNome }
-                )
-            }
-
-        Log.d("MainActivity", "📊 Processadas ${empresasMap.size} empresas:")
-        empresasMap.forEach { (nome, dados) ->
-            Log.d("MainActivity", "  🏢 $nome (ID: ${dados.empresaId}): ${dados.unidades.size} unidades")
-            dados.unidades.forEach { unidade ->
-                Log.d("MainActivity", "    🏭 ${unidade.unidadeNome} (ID: ${unidade.unidadeId})")
-            }
-        }
-    }
-
-    private fun configurarSpinnerEmpresas() {
-        val nomesEmpresas = empresasMap.keys.sorted()
-
-        if (nomesEmpresas.isEmpty()) {
-            Toast.makeText(this, "❌ Nenhuma empresa disponível", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        Log.d("MainActivity", "🏢 Empresas no spinner: $nomesEmpresas")
-
-        val adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_dropdown_item_1line,
-            nomesEmpresas
-        )
-        spinnerEmpresa.setAdapter(adapter)
-
-        spinnerEmpresa.setOnItemClickListener { parent, view, position, id ->
-            val empresaNome = nomesEmpresas[position]
-            empresaSelecionadaNome = empresaNome
-
-            val empresaData = empresasMap[empresaNome]
-            Log.d("MainActivity", "🏢 Empresa selecionada: $empresaNome (ID: ${empresaData?.empresaId})")
-
-            atualizarSpinnerUnidades(empresaNome)
-        }
-    }
-
-    private fun atualizarSpinnerUnidades(empresaNome: String) {
-        val empresaData = empresasMap[empresaNome]
-
-        if (empresaData == null) {
-            Log.e("MainActivity", "❌ Empresa não encontrada: $empresaNome")
-            spinnerUnidade.isEnabled = false
-            spinnerUnidade.setAdapter(null)
-            return
-        }
-
-        val unidades = empresaData.unidades
-
-        Log.d("MainActivity", "🏭 Unidades da empresa '$empresaNome': ${unidades.size}")
-
-        if (unidades.isEmpty()) {
-            Toast.makeText(this, "⚠️ Nenhuma unidade disponível para esta empresa", Toast.LENGTH_SHORT).show()
-            spinnerUnidade.isEnabled = false
-            spinnerUnidade.setAdapter(null)
-            return
-        }
-
-        // Criar lista de strings para o spinner
-        val nomesUnidades = unidades.map { it.unidadeNome }
-
-        val adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_dropdown_item_1line,
-            nomesUnidades
-        )
+    private fun popularUnidades(empresa: EmpresaComUnidades) {
+        val nomes = empresa.unidades.map { it.unidadeNome }
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, nomes)
         spinnerUnidade.setAdapter(adapter)
+        layoutSpinnerUnidade.isEnabled = true
         spinnerUnidade.isEnabled = true
+        spinnerUnidade.setText("", false)
+    }
 
-        spinnerUnidade.setOnItemClickListener { parent, view, position, id ->
-            val unidade = unidades[position]
-            unidadeIdSelecionada = unidade.unidadeId
+    private fun carregarModulos(unidadeId: Int) {
+        val unidade = empresaSelecionada?.unidades?.find { it.unidadeId == unidadeId } ?: return
+        viewModel.definirModulos(unidade.modulos)
+    }
 
-            Log.d("MainActivity", "🏭 Unidade selecionada: ${unidade.unidadeNome} (ID: ${unidade.unidadeId})")
+    private fun resetarSelecaoUnidade() {
+        unidadeIdSelecionada = null
+        spinnerUnidade.setText("", false)
+        layoutSpinnerUnidade.isEnabled = false
+        spinnerUnidade.isEnabled = false
+    }
+
+    private fun resetarSelecaoModulo() {
+        moduloSelecionado = null
+        tipoModuloAtual = TipoModulo.DESCONHECIDO
+        spinnerModule.setText("", false)
+        layoutSpinnerModule.isEnabled = false
+        spinnerModule.isEnabled = false
+        layoutTreinamentoFields.visibility = View.GONE
+        textViewDescricaoLabel.visibility = View.GONE
+        layoutDescricaoAula.visibility = View.GONE
+        viewModel.limparModulos()
+        viewModel.limparTreinamentos()
+    }
+
+    private fun detectarTipoModulo(modulo: moduloResponse): TipoModulo {
+        val abrev = modulo.abreviacao.uppercase()
+        val nome = modulo.nome.uppercase()
+        return when {
+            abrev.contains("GL") || nome.contains("GINASTICA") || nome.contains("LABORAL") -> TipoModulo.GINASTICA_LABORAL
+            abrev.contains("TR") || nome.contains("TREINAMENTO") -> TipoModulo.TREINAMENTO
+            else -> TipoModulo.DESCONHECIDO
         }
     }
 
-    private fun configurarListeners() {
-        buttonIniciarAula.setOnClickListener { iniciarNovaAula() }
-        buttonConfirmarAula.setOnClickListener { mostrarDialogConfirmacao() }
-        buttonAbortarAula.setOnClickListener { mostrarDialogAbortarAula() }
+    private fun atualizarCamposPorTipoModulo() {
+        when (tipoModuloAtual) {
+            TipoModulo.GINASTICA_LABORAL -> {
+                layoutTreinamentoFields.visibility = View.GONE
+                textViewDescricaoLabel.visibility = View.VISIBLE
+                layoutDescricaoAula.visibility = View.VISIBLE
+            }
+            TipoModulo.TREINAMENTO -> {
+                layoutTreinamentoFields.visibility = View.VISIBLE
+                textViewDescricaoLabel.visibility = View.GONE
+                layoutDescricaoAula.visibility = View.GONE
+                val token = sessionManager.getTokenWithBearer() ?: return
+                val unidadeId = unidadeIdSelecionada ?: return
+                viewModel.carregarTreinamentosSeNecessario(token, unidadeId)
+            }
+            TipoModulo.DESCONHECIDO -> {
+                layoutTreinamentoFields.visibility = View.GONE
+                textViewDescricaoLabel.visibility = View.GONE
+                layoutDescricaoAula.visibility = View.GONE
+            }
+        }
     }
 
     // ==========================================
-    // CRASH RECOVERY
+    // OBSERVERS
     // ==========================================
-    private fun verificarAulaEmAndamento() {
-        val aulaId = sessionManager.getAulaEmProgresso()
 
-        if (aulaId != null) {
-            AlertDialog.Builder(this)
-                .setTitle("⚠️ Aula em Andamento")
-                .setMessage("Você tem uma aula que não foi finalizada. Deseja continuar ou abortar?")
-                .setPositiveButton("Continuar") { _, _ ->
-                    aulaEmProgressoId = aulaId
-                    mostrarEstadoLeituraNFC("Aula em andamento", "Recuperada")
+    private fun observarViewModel() {
+        viewModel.uiState.observe(this) { state ->
+            if (state.empresasMap.isNotEmpty() && !empresasPopuladas) {
+                val nomes = state.empresasMap.keys.toList()
+                val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, nomes)
+                spinnerEmpresa.setAdapter(adapter)
+                empresasPopuladas = true
+            }
+
+            if (state.modulos.isNotEmpty()) {
+                val nomes = state.modulos.map { it.nome }
+                val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, nomes)
+                spinnerModule.setAdapter(adapter)
+                layoutSpinnerModule.isEnabled = true
+                spinnerModule.isEnabled = true
+            }
+
+            if (state.treinamentos.isNotEmpty()) {
+                val nomes = state.treinamentos.map { it.nome }
+                val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, nomes)
+                editTextNomeTreinamento.setAdapter(adapter)
+            }
+
+            state.mensagemErro?.let { erro ->
+                Toast.makeText(this, erro, Toast.LENGTH_LONG).show()
+                viewModel.limparErro()
+            }
+        }
+
+        viewModel.criarSessaoState.observe(this) { state ->
+            when (state) {
+                is AcaoState.Loading -> {
+                    buttonIniciarAula.isEnabled = false
+                    buttonIniciarAula.text = "Iniciando..."
                 }
-                .setNegativeButton("Abortar") { _, _ ->
-                    abortarAulaSemParticipantes(aulaId)
+                is AcaoState.Sucesso -> {
+                    val id = state.sessaoId ?: return@observe
+                    sessaoId = id
+                    aulaInicioMs = System.currentTimeMillis()
+                    sessionManager.salvarAulaEmProgresso(id)
+                    sessionManager.salvarInicioAulaEmProgresso(aulaInicioMs)
+                    unidadeIdSelecionada?.let { sessionManager.salvarUnidadeEmProgresso(it) }
+                    sessionManager.salvarModuloEmProgresso(moduloSelecionado?.nome)
+                    mostrarEstadoNFC()
+                    viewModel.consumirCriarSessaoEstado()
                 }
-                .setCancelable(false)
-                .show()
+                is AcaoState.Erro -> {
+                    buttonIniciarAula.isEnabled = true
+                    buttonIniciarAula.text = "Iniciar atividade"
+                    Toast.makeText(this, state.mensagem, Toast.LENGTH_LONG).show()
+                    viewModel.consumirCriarSessaoEstado()
+                }
+                is AcaoState.Idle -> {
+                    buttonIniciarAula.isEnabled = true
+                    buttonIniciarAula.text = "Iniciar atividade"
+                }
+            }
+        }
+
+        viewModel.confirmarSessaoState.observe(this) { state ->
+            when (state) {
+                is AcaoState.Sucesso -> {
+                    limparAulaEmProgresso()
+                    Toast.makeText(this, "Aula confirmada com sucesso!", Toast.LENGTH_SHORT).show()
+                    mostrarEstadoCriacao()
+                    viewModel.consumirConfirmarSessaoEstado()
+                }
+                is AcaoState.Erro -> {
+                    Toast.makeText(this, state.mensagem, Toast.LENGTH_LONG).show()
+                    viewModel.consumirConfirmarSessaoEstado()
+                }
+                else -> {}
+            }
+        }
+
+        viewModel.abortarSessaoState.observe(this) { state ->
+            when (state) {
+                is AcaoState.Sucesso -> {
+                    limparAulaEmProgresso()
+                    Toast.makeText(this, "Aula abortada.", Toast.LENGTH_SHORT).show()
+                    mostrarEstadoCriacao()
+                    viewModel.consumirAbortarSessaoEstado()
+                }
+                is AcaoState.Erro -> {
+                    Toast.makeText(this, state.mensagem, Toast.LENGTH_LONG).show()
+                    viewModel.consumirAbortarSessaoEstado()
+                }
+                else -> {}
+            }
+        }
+
+        viewModel.validarNFCState.observe(this) { state ->
+            when (state) {
+                is AcaoState.Sucesso -> {
+                    val nfc = nfcPendente ?: return@observe
+                    val funcionario = viewModel.funcionarioValidado.value
+                    val unidadeId = unidadeIdSelecionada ?: return@observe
+                    val participante = ParticipanteSessao(
+                        nfc = nfc,
+                        unidadeId = unidadeId.toString(),
+                        funcionarioId = funcionario?.funcionario_id,
+                        nome = funcionario?.nome,
+                        ativo = funcionario?.ativo,
+                        horarioRegistro = obterTimestampUtc()
+                    )
+                    participantes.add(participante)
+                    nfcsRegistrados.add(nfc)
+                    nfcPendente = null
+                    atualizarListaNFCs()
+                    viewModel.consumirValidarNFCEstado()
+                    validarProximoNfcDaFila()
+                }
+                is AcaoState.Erro -> {
+                    nfcPendente = null
+                    Toast.makeText(this, "Crachá não reconhecido: ${state.mensagem}", Toast.LENGTH_LONG).show()
+                    viewModel.consumirValidarNFCEstado()
+                    validarProximoNfcDaFila()
+                }
+                else -> {}
+            }
         }
     }
 
     // ==========================================
-    // FLUXO 1: CRIAR AULA
+    // BOTÕES
     // ==========================================
-    private fun iniciarNovaAula() {
-        val descricao = editTextDescricaoAula.text.toString().trim()
 
-        if (descricao.isEmpty()) {
-            Toast.makeText(this, "⚠️ Digite uma descrição para a aula", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (empresaSelecionadaNome == null) {
-            Toast.makeText(this, "⚠️ Selecione uma empresa", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (unidadeIdSelecionada == null) {
-            Toast.makeText(this, "⚠️ Selecione uma unidade", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val empresaData = empresasMap[empresaSelecionadaNome]
-        Log.d("MainActivity", "🎯 Criar aula: Empresa='$empresaSelecionadaNome' (ID: ${empresaData?.empresaId}), Unidade ID=$unidadeIdSelecionada")
-
-        criarAula(descricao, unidadeIdSelecionada!!)
+    private fun configurarBotoes() {
+        buttonIniciarAula.setOnClickListener { iniciarAula() }
+        buttonConfirmarAula.setOnClickListener { confirmarAula() }
+        buttonAbortarAula.setOnClickListener { abortarAula() }
     }
 
-    private fun criarAula(descricao: String, unidadeId: Int) {
+    private fun iniciarAula() {
         val token = sessionManager.getTokenWithBearer() ?: run {
+            Toast.makeText(this, "Sessão expirada. Faça login novamente.", Toast.LENGTH_SHORT).show()
             irParaLogin()
             return
         }
+        val usuario = sessionManager.getUsuario() ?: return
+        val instrutorId = usuario.instrutorId ?: run {
+            Toast.makeText(this, "Usuário não possui perfil de instrutor.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val unidadeId = unidadeIdSelecionada ?: run {
+            Toast.makeText(this, "Selecione uma unidade.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val modulo = moduloSelecionado ?: run {
+            Toast.makeText(this, "Selecione um módulo.", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        buttonIniciarAula.isEnabled = false
-        buttonIniciarAula.text = "Criando aula..."
+        val descricao: String
+        val nomeTreinamento: String
+        val treinamentoId: Int?
 
-        lifecycleScope.launch {
-            try {
-                val dataAtual = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).format(Date())
-
-                val request = CriarAulaRequest(
-                    descricao = descricao,
-                    unidadeId = unidadeId,
-                    data = dataAtual
-                )
-
-                Log.d("MainActivity", "📤 Request: $request")
-
-                val response = RetrofitInstance.api.criarAula(token, request)
-
-                if (response.isSuccessful) {
-                    val aulaResponse = response.body()
-
-                    if (aulaResponse != null) {
-                        aulaEmProgressoId = aulaResponse.aula.aulaId
-                        descricaoAulaAtual = descricao
-
-                        sessionManager.salvarAulaEmProgresso(aulaResponse.aula.aulaId)
-
-                        Toast.makeText(
-                            this@MainActivity,
-                            "✅ ${aulaResponse.message}",
-                            Toast.LENGTH_SHORT
-                        ).show()
-
-                        val unidadeNome = todasUnidadesDoInstrutor
-                            .find { it.unidadeId == unidadeId }
-                            ?.nomeUnidade ?: "Unidade"
-
-                        mostrarEstadoLeituraNFC(descricao, unidadeNome)
-                    } else {
-                        mostrarErro("Resposta vazia do servidor")
-                    }
-                } else {
-                    val errorBody = response.errorBody()?.string()
-                    Log.e("MainActivity", "❌ Erro response: $errorBody")
-                    mostrarErro(errorBody ?: "Erro ao criar aula")
+        when (tipoModuloAtual) {
+            TipoModulo.GINASTICA_LABORAL -> {
+                descricao = editTextDescricaoAula.text?.toString()?.trim() ?: ""
+                if (descricao.isBlank()) {
+                    Toast.makeText(this, "Digite uma descrição para a aula.", Toast.LENGTH_SHORT).show()
+                    return
                 }
-            } catch (e: Exception) {
-                Log.e("MainActivity", "❌ Exception criar aula: ${e.message}", e)
-                mostrarErro("Erro: ${e.message}")
-            } finally {
-                buttonIniciarAula.isEnabled = true
-                buttonIniciarAula.text = "🎯 Iniciar Aula"
+                nomeTreinamento = ""
+                treinamentoId = null
+            }
+            TipoModulo.TREINAMENTO -> {
+                val nomeDigitado = editTextNomeTreinamento.text?.toString()?.trim() ?: ""
+                if (nomeDigitado.isBlank()) {
+                    Toast.makeText(this, "Digite ou selecione o nome do treinamento.", Toast.LENGTH_SHORT).show()
+                    return
+                }
+                val existente = viewModel.uiState.value?.treinamentos
+                    ?.find { it.nome.equals(nomeDigitado, ignoreCase = true) }
+                treinamentoId = existente?.treinamentoId
+                nomeTreinamento = nomeDigitado
+                descricao = nomeDigitado
+            }
+            TipoModulo.DESCONHECIDO -> {
+                Toast.makeText(this, "Tipo de módulo não reconhecido.", Toast.LENGTH_SHORT).show()
+                return
+            }
+        }
+
+        viewModel.criarSessao(
+            token = token,
+            tipoModulo = tipoModuloAtual,
+            nomeTreinamento = nomeTreinamento,
+            descricao = descricao,
+            unidadeId = unidadeId,
+            instrutorId = instrutorId,
+            moduloId = modulo.id,
+            treinamentoSelecionadoId = treinamentoId
+        )
+    }
+
+    private fun confirmarAula() {
+        val token = sessionManager.getTokenWithBearer() ?: return
+        val id = sessaoId ?: return
+        viewModel.confirmarSessao(token, id, obterTimestampUtc(), participantes.toList())
+    }
+
+    private fun abortarAula() {
+        AlertDialog.Builder(this)
+            .setTitle("Abortar Aula")
+            .setMessage("Deseja abortar a aula? Os dados registrados serão descartados.")
+            .setPositiveButton("Abortar") { _, _ ->
+                val token = sessionManager.getTokenWithBearer() ?: return@setPositiveButton
+                val id = sessaoId ?: return@setPositiveButton
+                viewModel.abortarSessao(token, id, obterTimestampUtc(), participantes.toList())
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    // ==========================================
+    // ESTADOS DE TELA
+    // ==========================================
+
+    private fun mostrarEstadoNFC() {
+        layoutCriacaoAula.visibility = View.GONE
+        layoutLeituraNFC.visibility = View.VISIBLE
+        atualizarVisibilidadeLogout(false)
+        participantes.clear()
+        nfcsRegistrados.clear()
+        filaNfcsPendentes.clear()
+        nfcPendente = null
+        atualizarListaNFCs()
+
+        val unidade = empresaSelecionada?.unidades?.find { it.unidadeId == unidadeIdSelecionada }
+        textViewDescricaoAtual.text = moduloSelecionado?.nome ?: sessionManager.getModuloEmProgresso() ?: ""
+        textViewUnidadeAtual.text = "Unidade: ${unidade?.unidadeNome ?: ""}"
+
+        ativarNFC()
+        iniciarTimer()
+    }
+
+    private fun mostrarEstadoCriacao() {
+        layoutLeituraNFC.visibility = View.GONE
+        layoutCriacaoAula.visibility = View.VISIBLE
+        atualizarVisibilidadeLogout(true)
+        desativarNFC()
+        pararTimer()
+        sessaoId = null
+        participantes.clear()
+        nfcsRegistrados.clear()
+        filaNfcsPendentes.clear()
+        nfcPendente = null
+    }
+
+    private fun atualizarVisibilidadeLogout(exibir: Boolean) {
+        if (exibirLogoutNoMenu == exibir) return
+        exibirLogoutNoMenu = exibir
+        invalidateOptionsMenu()
+    }
+
+    // ==========================================
+    // NFC
+    // ==========================================
+
+    override fun onResume() {
+        super.onResume()
+        if (layoutLeituraNFC.visibility == View.VISIBLE) {
+            ativarNFC()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        desativarNFC()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val action = intent.action
+        if (action == NfcAdapter.ACTION_TAG_DISCOVERED ||
+            action == NfcAdapter.ACTION_NDEF_DISCOVERED ||
+            action == NfcAdapter.ACTION_TECH_DISCOVERED
+        ) {
+            val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+            tag?.let {
+                val nfcId = it.id.joinToString("") { byte -> "%02X".format(byte) }
+                if (layoutLeituraNFC.visibility == View.VISIBLE) {
+                    registrarNFC(nfcId)
+                }
             }
         }
     }
 
-    // ==========================================
-    // RESTO DO CÓDIGO (NFC, CONFIRMAR, ABORTAR)
-    // ==========================================
+    private fun registrarNFC(nfc: String) {
+        if (nfcsRegistrados.contains(nfc) || nfcPendente == nfc || filaNfcsPendentes.contains(nfc)) {
+            Toast.makeText(this, "Crachá já registrado", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-    private fun mostrarEstadoLeituraNFC(descricao: String, unidade: String) {
-        layoutCriacaoAula.visibility = View.GONE
-        layoutLeituraNFC.visibility = View.VISIBLE
+        if (nfcPendente != null) {
+            filaNfcsPendentes.addLast(nfc)
+            return
+        }
 
-        textViewDescricaoAtual.text = descricao
-        textViewUnidadeAtual.text = "Unidade: $unidade"
-        textViewContador.text = "0"
-        textViewListaNFCs.text = "Nenhum crachá lido ainda."
-
-        listaParticipantes.clear()
+        iniciarValidacaoNfc(nfc)
     }
 
-    private fun mostrarErro(mensagem: String) {
-        Toast.makeText(this, "❌ $mensagem", Toast.LENGTH_LONG).show()
-        Log.e("MainActivity", mensagem)
+    private fun iniciarValidacaoNfc(nfc: String) {
+        val token = sessionManager.getTokenWithBearer() ?: return
+        val unidadeId = unidadeIdSelecionada ?: return
+        nfcPendente = nfc
+        viewModel.validarNFC(token, nfc, unidadeId)
     }
 
-    private fun irParaLogin() {
-        val intent = Intent(this, LoginActivity::class.java)
-        startActivity(intent)
-        finish()
+    private fun validarProximoNfcDaFila() {
+        if (nfcPendente != null) return
+        val proximo = filaNfcsPendentes.pollFirst() ?: return
+        iniciarValidacaoNfc(proximo)
     }
 
-    private fun habilitarLeituraNFC() {
+    private fun atualizarListaNFCs() {
+        if (participantes.isEmpty()) {
+            textViewListaNFCs.text = "Nenhum crachá lido ainda."
+        } else {
+            textViewListaNFCs.text = participantes.joinToString("\n") { p ->
+                val nome = p.nome?.takeIf { it.isNotBlank() }
+                if (nome != null) "$nome - ${p.nfc}"
+                else "Não cadastrado - Desconhecido (${p.nfc})"
+            }
+        }
+        textViewContador.text = "Participantes registrados: ${participantes.size}"
+    }
+
+    private fun ativarNFC() {
+        val adapter = nfcAdapter ?: return
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_MUTABLE
         )
-        nfcAdapter?.enableForegroundDispatch(this, pendingIntent, null, null)
+        try {
+            adapter.enableForegroundDispatch(this, pendingIntent, null, null)
+        } catch (e: Exception) {
+            Log.w("NFC", "Erro ao ativar NFC: ${e.message}")
+        }
     }
 
-    private fun desabilitarLeituraNFC() {
-        nfcAdapter?.disableForegroundDispatch(this)
+    private fun desativarNFC() {
+        try {
+            nfcAdapter?.disableForegroundDispatch(this)
+        } catch (e: Exception) {
+            Log.w("NFC", "Erro ao desativar NFC: ${e.message}")
+        }
     }
 
-    private fun processarTagNFC(tag: Tag) {
-        val agora = System.currentTimeMillis()
-        if (agora - ultimaLeituraNFC < DEBOUNCE_DELAY_MS) {
-            Log.d("NFC", "⏭️ Leitura ignorada (debounce)")
-            return
-        }
-        ultimaLeituraNFC = agora
+    // ==========================================
+    // TIMER
+    // ==========================================
 
-        val nfcId = tag.id.joinToString("") { "%02X".format(it) }
-        Log.d("NFC", "📱 NFC lido: $nfcId")
-
-        if (listaParticipantes.any { it.nfc == nfcId }) {
-            Log.w("NFC", "⚠️ NFC duplicado: $nfcId")
-            Toast.makeText(this, "⚠️ Crachá já registrado!", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        buscarFuncionarioPorNFC(nfcId)
-    }
-
-    private fun buscarFuncionarioPorNFC(nfc: String) {
-        if (unidadeIdSelecionada == null) {
-            Log.e("NFC", "❌ unidadeIdSelecionada é null")
-            return
-        }
-
-        lifecycleScope.launch {
-            try {
-                val request = GetFuncionarioByNFCRequest(
-                    nfc = nfc,
-                    unidade_id = unidadeIdSelecionada!!
-                )
-
-                val response = RetrofitInstance.api.getFuncionarioByNFC(request)
-
-                if (response.isSuccessful) {
-                    val funcionario = response.body()
-
-                    if (funcionario != null) {
-                        val existe = funcionario.funcionario_id != null
-                        val nome = funcionario.nome ?: "Desconhecido"
-
-                        val participante = ParticipanteComStatus(
-                            nfc = nfc,
-                            funcionarioId = funcionario.funcionario_id,
-                            nome = nome,
-                            existe = existe
-                        )
-
-                        listaParticipantes.add(participante)
-                        atualizarUI()
-
-                        val mensagem = if (existe) {
-                            "✅ $nome"
-                        } else {
-                            "⚠️ Crachá não cadastrado"
-                        }
-
-                        Toast.makeText(this@MainActivity, mensagem, Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    Log.e("NFC", "❌ Erro response: ${response.code()}")
-                }
-            } catch (e: Exception) {
-                Log.e("NFC", "❌ Exceção: ${e.message}", e)
+    private fun iniciarTimer() {
+        pararTimer()
+        val inicio = aulaInicioMs.takeIf { it > 0 } ?: System.currentTimeMillis()
+        val runnable = object : Runnable {
+            override fun run() {
+                val elapsed = System.currentTimeMillis() - inicio
+                val h = elapsed / 3600000
+                val m = (elapsed % 3600000) / 60000
+                val s = (elapsed % 60000) / 1000
+                textViewDuracaoAula.text = "Duração: %02d:%02d:%02d".format(h, m, s)
+                timerHandler.postDelayed(this, 1000)
             }
         }
+        timerRunnable = runnable
+        timerHandler.post(runnable)
     }
 
-    private fun atualizarUI() {
-        textViewContador.text = listaParticipantes.size.toString()
-
-        val listaTexto = if (listaParticipantes.isEmpty()) {
-            "Nenhum crachá lido ainda."
-        } else {
-            listaParticipantes.joinToString("\n") { p ->
-                val status = if (p.existe) "✅" else "⚠️"
-                "$status ${p.nome ?: "Desconhecido"} (${p.nfc})"
-            }
-        }
-
-        textViewListaNFCs.text = listaTexto
+    private fun pararTimer() {
+        timerRunnable?.let { timerHandler.removeCallbacks(it) }
+        timerRunnable = null
     }
 
-    private fun mostrarDialogConfirmacao() {
-        if (listaParticipantes.isEmpty()) {
-            Toast.makeText(this, "⚠️ Nenhum participante registrado!", Toast.LENGTH_SHORT).show()
-            return
-        }
+    // ==========================================
+    // CRASH RECOVERY
+    // ==========================================
 
-        AlertDialog.Builder(this)
-            .setTitle("✅ Confirmar Aula")
-            .setMessage("Confirmar aula com ${listaParticipantes.size} participante(s)?")
-            .setPositiveButton("Sim") { _, _ -> confirmarAula() }
-            .setNegativeButton("Cancelar", null)
-            .show()
+    private fun verificarAulaEmProgresso() {
+        val aulaId = sessionManager.getAulaEmProgresso() ?: return
+        val inicioMs = sessionManager.getInicioAulaEmProgresso() ?: return
+        sessaoId = aulaId
+        aulaInicioMs = inicioMs
+        unidadeIdSelecionada = sessionManager.getUnidadeEmProgresso()
+        textViewDescricaoAtual.text = sessionManager.getModuloEmProgresso() ?: ""
+        textViewUnidadeAtual.text = ""
+        mostrarEstadoNFC()
     }
 
-    private fun confirmarAula() {
-        val aulaId = aulaEmProgressoId ?: return
-        val token = sessionManager.getTokenWithBearer() ?: run {
-            irParaLogin()
-            return
-        }
+    // ==========================================
+    // HELPERS
+    // ==========================================
 
-        buttonConfirmarAula.isEnabled = false
-        buttonConfirmarAula.text = "Confirmando..."
-
-        lifecycleScope.launch {
-            try {
-                val participantes = listaParticipantes.map { p ->
-                    ParticipanteAula(
-                        nfc = p.nfc,
-                        unidadeId = unidadeIdSelecionada!!,
-                        funcionarioId = p.funcionarioId,
-                        nome = p.nome
-                    )
-                }
-
-                val request = ConfirmarAulaRequest(participantes = participantes)
-                val response = RetrofitInstance.api.confirmarAula(token, aulaId, request)
-
-                if (response.isSuccessful) {
-                    sessionManager.limparAulaEmProgresso()
-
-                    Toast.makeText(
-                        this@MainActivity,
-                        "✅ Aula confirmada com sucesso!",
-                        Toast.LENGTH_LONG
-                    ).show()
-
-                    voltarParaEstadoInicial()
-                } else {
-                    val errorBody = response.errorBody()?.string()
-                    mostrarErro(errorBody ?: "Erro ao confirmar aula")
-                }
-            } catch (e: Exception) {
-                mostrarErro("Erro: ${e.message}")
-            } finally {
-                buttonConfirmarAula.isEnabled = true
-                buttonConfirmarAula.text = "✅ Confirmar Aula"
-            }
-        }
+    private fun limparAulaEmProgresso() {
+        sessionManager.limparAulaEmProgresso()
+        sessionManager.limparUnidadeEmProgresso()
+        sessionManager.limparModuloEmProgresso()
     }
 
-    private fun mostrarDialogAbortarAula() {
-        AlertDialog.Builder(this)
-            .setTitle("❌ Abortar Aula")
-            .setMessage("Tem certeza que deseja abortar esta aula?")
-            .setPositiveButton("Sim") { _, _ -> abortarAula() }
-            .setNegativeButton("Cancelar", null)
-            .show()
+    private fun obterTimestampUtc(): String {
+        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+        format.timeZone = TimeZone.getTimeZone("UTC")
+        return format.format(Date())
     }
 
-    private fun abortarAula() {
-        val aulaId = aulaEmProgressoId ?: return
-        val token = sessionManager.getTokenWithBearer() ?: run {
-            irParaLogin()
-            return
-        }
-
-        buttonAbortarAula.isEnabled = false
-        buttonAbortarAula.text = "Abortando..."
-
-        lifecycleScope.launch {
-            try {
-                val request = AbortarAulaRequest(participantes = null)
-                val response = RetrofitInstance.api.abortarAula(token, aulaId, request)
-
-                if (response.isSuccessful) {
-                    sessionManager.limparAulaEmProgresso()
-
-                    Toast.makeText(
-                        this@MainActivity,
-                        "✅ Aula abortada",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    voltarParaEstadoInicial()
-                } else {
-                    val errorBody = response.errorBody()?.string()
-                    mostrarErro(errorBody ?: "Erro ao abortar aula")
-                }
-            } catch (e: Exception) {
-                mostrarErro("Erro: ${e.message}")
-            } finally {
-                buttonAbortarAula.isEnabled = true
-                buttonAbortarAula.text = "❌ Abortar Aula"
-            }
-        }
-    }
-
-    private fun abortarAulaSemParticipantes(aulaId: Int) {
-        val token = sessionManager.getTokenWithBearer() ?: run {
-            irParaLogin()
-            return
-        }
-
-        lifecycleScope.launch {
-            try {
-                val request = AbortarAulaRequest(participantes = null)
-                val response = RetrofitInstance.api.abortarAula(token, aulaId, request)
-
-                if (response.isSuccessful) {
-                    sessionManager.limparAulaEmProgresso()
-                    Toast.makeText(
-                        this@MainActivity,
-                        "✅ Aula abortada",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Erro ao abortar aula: ${e.message}")
-            }
-        }
-    }
-
-    private fun voltarParaEstadoInicial() {
-        layoutLeituraNFC.visibility = View.GONE
-        layoutCriacaoAula.visibility = View.VISIBLE
-
-        aulaEmProgressoId = null
-        unidadeIdSelecionada = null
-        empresaSelecionadaNome = null
-        descricaoAulaAtual = ""
-        listaParticipantes.clear()
-
-        editTextDescricaoAula.text?.clear()
-
-        spinnerEmpresa.setText("", false)
-        spinnerUnidade.isEnabled = false
-        spinnerUnidade.setText("", false)
+    private fun irParaLogin() {
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 }

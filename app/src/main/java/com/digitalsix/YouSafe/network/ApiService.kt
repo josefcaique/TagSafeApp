@@ -1,5 +1,7 @@
 package com.digitalsix.YouSafe.network
 
+import com.digitalsix.YouSafe.network.modulos.moduloResponse
+import com.google.gson.JsonElement
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -10,10 +12,16 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
-    /**
-     * Endpoint /auth/me - Retorna dados atualizados do usuário
-     * Usado para refresh de dados e validação de token
-     */
+    @POST("auth/refresh")
+    suspend fun refreshToken(
+        @Body request: RefreshTokenRequest
+    ): Response<LoginResponse>
+
+    @POST("auth/forgot-password")
+    suspend fun forgotPassword(
+        @Body request: ForgotPasswordRequest
+    ): Response<ForgotPasswordResponse>
+
     @GET("auth/me")
     suspend fun getMe(@Header("Authorization") token: String): Response<LoginResponse>
 
@@ -28,56 +36,77 @@ interface ApiService {
     ): Response<ResetPasswordResponse>
 
     // ==========================================
-    // ROTAS DE AULAS
+    // ROTAS DE GINASTICA, TREINAMENTOS E SESSOES
     // ==========================================
-    @POST("aulas")
-    suspend fun criarAula(
-        @Header("Authorization") token: String,
-        @Body request: CriarAulaRequest
-    ): Response<CriarAulaResponse>
 
-    @POST("aulas/{id}/confirmar")
-    suspend fun confirmarAula(
+    @POST("ginastica-laboral")
+    suspend fun criarGinasticaLaboral(
+        @Header("Authorization") token: String,
+        @Body request: GinasticaLaboralRequest
+    ): Response<IdResponse>
+
+    @POST("treinamentos")
+    suspend fun criarTreinamento(
+        @Header("Authorization") token: String,
+        @Body request: TreinamentoRequest
+    ): Response<IdResponse>
+
+    @POST("sessoes")
+    suspend fun criarSessao(
+        @Header("Authorization") token: String,
+        @Body request: SessaoRequest
+    ): Response<JsonElement>
+
+    @POST("sessoes/{id}/confirmar")
+    suspend fun confirmarSessao(
         @Header("Authorization") token: String,
         @Path("id") aulaId: Int,
-        @Body request: ConfirmarAulaRequest
-    ): Response<ConfirmarAulaResponse>
+        @Body request: ConfirmarSessaoRequest
+    ): Response<Any>
 
-    @POST("aulas/{id}/abortar")
-    suspend fun abortarAula(
+    @POST("sessoes/{id}/abortar")
+    suspend fun abortarSessao(
         @Header("Authorization") token: String,
         @Path("id") aulaId: Int,
         @Body request: AbortarAulaRequest
     ): Response<AbortarAulaResponse>
 
     // ==========================================
-    // ROTAS DE TIPOS DE AULA
+    // ROTAS SEM AUTENTICAÇÃO (Módulos, Tipos, etc)
     // ==========================================
     @GET("tipos-aula")
-    suspend fun getTiposAula(
-        @Header("Authorization") token: String
-    ): Response<List<TipoAula>>
+    suspend fun getTiposAula(): Response<List<TipoAula>>
+
+    @GET("modulos/instrutor/{instrutorId}/unidade/{unidadeId}")
+    suspend fun getModulosByInstrutorAndUnidade(
+        @Path("instrutorId") instrutorId: Int,
+        @Path("unidadeId") unidadeId: Int
+    ): Response<List<moduloResponse>>
 
     // ==========================================
-    // ROTAS DE EMPRESAS E UNIDADES
+    // ROTAS COM AUTENTICAÇÃO
     // ==========================================
-
-    /**
-     * GET /empresas - Lista todas as unidades com seus dados de empresa
-     * Retorna: Lista de unidades com empresa_id, nome da empresa, etc
-     */
     @GET("empresas")
-    suspend fun getEmpresas(): Response<List<EmpresaUnidadeResponse>>
+    suspend fun getEmpresas(
+        @Header("Authorization") token: String
+    ): Response<List<EmpresaUnidadeResponse>>
 
-    // ==========================================
-    // ROTAS DE FUNCIONÁRIOS
-    // ==========================================
+    @GET("instrutores/unidades-atendidas/{instrutorId}")
+    suspend fun getUnidadesAtendidasPorInstrutor(
+        @Header("Authorization") token: String,
+        @Path("instrutorId") instrutorId: Int
+    ): Response<InstrutorUnidadesResponse>
 
-    /**
-     * Buscar funcionário por NFC
-     */
-    @POST("funcionarios/nfc")
+    @GET("funcionarios/nfc/{nfc}/unidade/{unidadeId}")
     suspend fun getFuncionarioByNFC(
-        @Body request: GetFuncionarioByNFCRequest
+        @Header("Authorization") token: String,
+        @Path("nfc") nfc: String,
+        @Path("unidadeId") unidadeId: Int
     ): Response<GetFuncionarioByNFCResponse>
+
+    @GET("treinamentos/unidade/{unidadeId}")
+    suspend fun getTreinamentosByUnidade(
+        @Header("Authorization") token: String,
+        @Path("unidadeId") unidadeId: Int
+    ): Response<List<TreinamentoResponse>>
 }

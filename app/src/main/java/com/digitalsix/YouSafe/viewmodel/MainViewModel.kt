@@ -19,6 +19,7 @@ import com.digitalsix.YouSafe.network.SessaoRequest
 import com.digitalsix.YouSafe.network.TreinamentoRequest
 import com.digitalsix.YouSafe.network.InstrutorUnidadesResponse
 import com.digitalsix.YouSafe.network.TreinamentoResponse
+import com.digitalsix.YouSafe.network.UnidadeAtendida
 import com.digitalsix.YouSafe.network.modulos.moduloResponse
 import com.digitalsix.YouSafe.repository.ApiResult
 import com.digitalsix.YouSafe.repository.MainRepository
@@ -43,11 +44,15 @@ data class MainUiState(
 sealed class AcaoState {
     object Idle : AcaoState()
     object Loading : AcaoState()
-    data class Sucesso(val sessaoId: Int? = null) : AcaoState()
+    data class Sucesso(val sessaoId: String? = null) : AcaoState()
     data class Erro(val mensagem: String) : AcaoState()
 }
 
 class MainViewModel(private val repository: MainRepository) : ViewModel() {
+    private companion object {
+        const val STATUS_EM_ANDAMENTO_UUID = "fc0fb24e-3dba-4814-8d03-6daf3a4d467b"
+    }
+
     private val _uiState = MutableLiveData(MainUiState())
     val uiState: LiveData<MainUiState> = _uiState
 
@@ -66,40 +71,31 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
     private val _funcionarioValidado = MutableLiveData<GetFuncionarioByNFCResponse?>(null)
     val funcionarioValidado: LiveData<GetFuncionarioByNFCResponse?> = _funcionarioValidado
 
-    private var treinamentosUnidadeId: Int? = null
+    private var treinamentosUnidadeId: String? = null
     private var carregandoTreinamentos = false
 
-    fun carregarEmpresasEUnidades(token: String, instrutorId: Int) {
+    fun carregarEmpresasEUnidades(
+        token: String,
+        instrutorId: String,
+        unidadesDoLogin: List<UnidadeAtendida> = emptyList()
+    ) {
         updateState { it.copy(carregandoEmpresas = true, mensagemErro = null) }
         viewModelScope.launch {
             when (val result = repository.getUnidadesAtendidas(token, instrutorId)) {
                 is ApiResult.Success -> {
-                    val unidades = result.data.unidadesAtendidas
-                    if (unidades.isEmpty()) {
+                    val empresasMap = montarEmpresasMap(result.data.unidades.orEmpty())
+                        .ifEmpty { montarEmpresasMap(unidadesDoLogin.map { it.toDetalhe() }) }
+
+                    if (empresasMap.isEmpty()) {
                         updateState {
                             it.copy(
                                 empresasMap = emptyMap(),
                                 carregandoEmpresas = false,
-                                mensagemErro = "Nenhuma unidade encontrada para este instrutor"
+                                mensagemErro = "Nenhuma unidade com UUID encontrada para este instrutor"
                             )
                         }
                         return@launch
                     }
-
-                    val empresasMap = unidades
-                        .groupBy { it.empresa }
-                        .mapValues { (empresaNome, unidadesEmpresa) ->
-                            EmpresaComUnidades(
-                                empresaNome = empresaNome,
-                                unidades = unidadesEmpresa.map {
-                                    UnidadeInfo(
-                                        unidadeId = it.id,
-                                        unidadeNome = it.nome,
-                                        modulos = it.modulos
-                                    )
-                                }.sortedBy { it.unidadeNome }
-                            )
-                        }
 
                     updateState {
                         it.copy(
@@ -110,23 +106,67 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
                     }
                 }
                 is ApiResult.Error -> {
-                    Log.e("EMPRESAS", "Erro na API: code=${result.code} | message=${result.message}")
-                    updateState {
-                        it.copy(
-                            carregandoEmpresas = false,
-                            mensagemErro = result.message
-                        )
+                    val empresasMap = montarEmpresasMap(unidadesDoLogin.map { it.toDetalhe() })
+                    if (empresasMap.isNotEmpty()) {
+                        updateState {
+                            it.copy(
+                                empresasMap = empresasMap,
+                                carregandoEmpresas = false,
+                                mensagemErro = null
+                            )
+                        }
+                    } else {
+                        Log.e("EMPRESAS", "Erro na API: code=${result.code} | message=${result.message}")
+                        updateState {
+                            it.copy(
+                                carregandoEmpresas = false,
+                                mensagemErro = result.message
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
+    private fun montarEmpresasMap(
+        unidades: List<UnidadeAtendidaDetalhe>
+    ): Map<String, EmpresaComUnidades> {
+        return unidades
+            .filter { !it.publicId.isNullOrBlank() }
+            .groupBy { it.empresa ?: "Empresa" }
+            .mapValues { (empresaNome, unidadesEmpresa) ->
+                EmpresaComUnidades(
+                    empresaNome = empresaNome,
+                    unidades = unidadesEmpresa.map {
+                        UnidadeInfo(
+                            unidadeId = it.id ?: 0,
+                            publicId = it.publicId.orEmpty(),
+                            unidadeNome = it.nome.orEmpty(),
+                            modulos = it.modulos.orEmpty().filter { modulo ->
+                                !modulo.publicId.isNullOrBlank()
+                            }
+                        )
+                    }.sortedBy { it.unidadeNome }
+                )
+            }
+    }
+
+    private fun UnidadeAtendida.toDetalhe(): UnidadeAtendidaDetalhe {
+        return UnidadeAtendidaDetalhe(
+            id = id,
+            publicId = publicId,
+            nome = nome,
+            empresa = empresa,
+            modulos = modulos
+        )
+    }
+
     fun definirModulos(modulos: List<moduloResponse>) {
         updateState { it.copy(modulos = modulos) }
     }
 
-    fun carregarTreinamentosSeNecessario(token: String, unidadeId: Int) {
+    fun carregarTreinamentosSeNecessario(token: String, unidadeId: String) {
         if (carregandoTreinamentos) return
         val treinamentosAtual = _uiState.value?.treinamentos.orEmpty()
         if (treinamentosUnidadeId == unidadeId && treinamentosAtual.isNotEmpty()) return
@@ -151,25 +191,27 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         tipoModulo: TipoModulo,
         nomeTreinamento: String,
         descricao: String,
-        unidadeId: Int,
-        instrutorId: Int,
-        moduloId: Int,
-        treinamentoSelecionadoId: Int?
+        unidadeId: String,
+        instrutorId: String,
+        moduloId: String,
+        treinamentoSelecionadoId: String?
     ) {
         _criarSessaoState.value = AcaoState.Loading
         viewModelScope.launch {
-            val treinamentoId: Int?
-            val ginasticaLaboralId: Int?
+            val treinamentoId: String?
+            val ginasticaLaboralId: String?
 
             when (tipoModulo) {
                 TipoModulo.GINASTICA_LABORAL -> {
+                    // Nota: O guia não detalhou POST /ginastica-laboral com UUID,
+                    // mas seguindo a lógica de outros campos de unidade_id
                     val result = repository.criarGinasticaLaboral(
                         token,
                         GinasticaLaboralRequest(descricao = descricao)
                     )
                     when (result) {
                         is ApiResult.Success -> {
-                            val id = result.data.id
+                            val id = result.data.publicId ?: result.data.id
                             if (id == null) {
                                 _criarSessaoState.value =
                                     AcaoState.Erro("Resposta sem ID da ginastica laboral")
@@ -199,12 +241,12 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
                                 validadeMeses = 0,
                                 obrigatorio = false,
                                 unidadeId = unidadeId,
-                                categoriasId = emptyList()
+                                categorias = emptyList()
                             )
                         )
                         when (result) {
                             is ApiResult.Success -> {
-                                val id = result.data.id
+                                val id = result.data.publicId ?: result.data.id
                                 if (id == null) {
                                     _criarSessaoState.value =
                                         AcaoState.Erro("Resposta sem ID do treinamento")
@@ -229,7 +271,7 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
             val request = SessaoRequest(
                 unidadeId = unidadeId,
                 instrutorId = instrutorId,
-                statusId = 1,
+                statusId = STATUS_EM_ANDAMENTO_UUID,
                 dataInicio = obterTimestampUtc(),
                 treinamentoId = treinamentoId,
                 ginasticaLaboralId = ginasticaLaboralId,
@@ -255,7 +297,7 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
 
     fun confirmarSessao(
         token: String,
-        sessaoId: Int,
+        sessaoId: String,
         dataFim: String,
         participantes: List<ParticipanteSessao>
     ) {
@@ -274,7 +316,7 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
 
     fun abortarSessao(
         token: String,
-        sessaoId: Int,
+        sessaoId: String,
         dataFim: String,
         participantes: List<ParticipanteSessao>
     ) {
@@ -303,7 +345,7 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         _abortarSessaoState.value = AcaoState.Idle
     }
 
-    fun validarNFC(token: String, nfc: String, unidadeId: Int) {
+    fun validarNFC(token: String, nfc: String, unidadeId: String) {
         _validarNFCState.value = AcaoState.Loading
         viewModelScope.launch {
             when (val result = repository.getFuncionarioByNFC(token, nfc, unidadeId)) {
@@ -324,7 +366,7 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         _funcionarioValidado.value = null
     }
 
-    private fun carregarTreinamentos(token: String, unidadeId: Int) {
+    fun carregarTreinamentos(token: String, unidadeId: String) {
         viewModelScope.launch {
             carregandoTreinamentos = true
             updateState { it.copy(carregandoTreinamentos = true, mensagemErro = null) }
@@ -357,21 +399,22 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         _uiState.value = update(current)
     }
 
-    private fun extrairIdSessao(sessaoCriada: SessaoCriada): Int? {
+    private fun extrairIdSessao(sessaoCriada: SessaoCriada): String? {
         return extrairIdSessao(sessaoCriada.body)
             ?: extrairIdSessaoDeLocation(sessaoCriada.location)
     }
 
-    private fun extrairIdSessao(body: JsonElement?): Int? {
+    private fun extrairIdSessao(body: JsonElement?): String? {
         if (body == null) return null
         if (body.isJsonPrimitive) {
             val prim = body.asJsonPrimitive
-            return if (prim.isNumber) prim.asInt else prim.asString.toIntOrNull()
+            return prim.asString
         }
         if (!body.isJsonObject) return null
 
         val obj = body.asJsonObject
         val keys = listOf(
+            "public_id",
             "id",
             "sessao_id",
             "sessaoId",
@@ -384,9 +427,7 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
             if (obj.has(key)) {
                 val id = obj.get(key)
                 if (id.isJsonPrimitive) {
-                    val prim = id.asJsonPrimitive
-                    val value = if (prim.isNumber) prim.asInt else prim.asString.toIntOrNull()
-                    if (value != null) return value
+                    return id.asJsonPrimitive.asString
                 }
             }
         }
@@ -398,10 +439,11 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         return null
     }
 
-    private fun extrairIdSessaoDeLocation(locationHeader: String?): Int? {
+    private fun extrairIdSessaoDeLocation(locationHeader: String?): String? {
         if (locationHeader.isNullOrBlank()) return null
-        val match = Regex(".*/(\\d+)$").find(locationHeader)
-        return match?.groupValues?.get(1)?.toIntOrNull()
+        // Tenta capturar UUID ou ID numérico no final da URL
+        val match = Regex(".*/([a-f0-9\\-]+|\\d+)$").find(locationHeader)
+        return match?.groupValues?.get(1)
     }
 
     private fun obterTimestampUtc(): String {

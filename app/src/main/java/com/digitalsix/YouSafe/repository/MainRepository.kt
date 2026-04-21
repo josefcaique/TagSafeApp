@@ -24,27 +24,21 @@ class MainRepository(private val api: ApiService) {
     suspend fun getEmpresas(token: String): ApiResult<List<EmpresaUnidadeResponse>> =
         safeCallList { api.getEmpresas(token) }
 
-    suspend fun getUnidadesAtendidas(token: String, instrutorId: Int): ApiResult<InstrutorUnidadesResponse> =
-        safeCall { api.getUnidadesAtendidasPorInstrutor(token, instrutorId) }
-
-    suspend fun getModulos(
-        instrutorId: Int,
-        unidadeId: Int
-    ): ApiResult<List<moduloResponse>> =
-        safeCallList { api.getModulosByInstrutorAndUnidade(instrutorId, unidadeId) }
+    suspend fun getUnidadesAtendidas(token: String, instrutorUuid: String): ApiResult<InstrutorUnidadesResponse> =
+        safeCall { api.getUnidadesAtendidasPorInstrutor(token, instrutorUuid) }
 
     suspend fun getTreinamentos(
         token: String,
-        unidadeId: Int
+        unidadeUuid: String
     ): ApiResult<List<TreinamentoResponse>> =
-        safeCallList { api.getTreinamentosByUnidade(token, unidadeId) }
+        safeCallList { api.getTreinamentosByUnidade(token, unidadeUuid) }
 
     suspend fun getFuncionarioByNFC(
         token: String,
         nfc: String,
-        unidadeId: Int
+        unidadeUuid: String
     ): ApiResult<GetFuncionarioByNFCResponse> =
-        safeCall { api.getFuncionarioByNFC(token, nfc, unidadeId) }
+        safeCall { api.getFuncionarioByNFC(token, nfc, unidadeUuid) }
 
     suspend fun criarGinasticaLaboral(
         token: String,
@@ -81,15 +75,15 @@ class MainRepository(private val api: ApiService) {
 
     suspend fun confirmarSessao(
         token: String,
-        sessaoId: Int,
+        sessaoUuid: String,
         request: ConfirmarSessaoRequest
-    ): ApiResult<Unit> = safeCallUnit { api.confirmarSessao(token, sessaoId, request) }
+    ): ApiResult<Unit> = safeCallUnit { api.confirmarSessao(token, sessaoUuid, request) }
 
     suspend fun abortarSessao(
         token: String,
-        sessaoId: Int,
+        sessaoUuid: String,
         request: AbortarAulaRequest
-    ): ApiResult<Unit> = safeCallUnit { api.abortarSessao(token, sessaoId, request) }
+    ): ApiResult<Unit> = safeCallUnit { api.abortarSessao(token, sessaoUuid, request) }
 
     private suspend fun <T> safeCall(
         call: suspend () -> Response<T>

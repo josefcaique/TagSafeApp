@@ -9,6 +9,7 @@ data class EmpresaComUnidades(
 
 data class UnidadeInfo(
     val unidadeId: Int,
+    val publicId: String,
     val unidadeNome: String,
     val modulos: List<moduloResponse>
 )

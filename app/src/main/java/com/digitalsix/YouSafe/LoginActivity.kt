@@ -236,7 +236,13 @@ class LoginActivity : AppCompatActivity() {
     private fun verificarPrimeiroAcesso() {
         val usuario = sessionManager.getUsuario()
 
-        if (usuario != null && usuario.primeiroAcesso) {
+        if (usuario == null) {
+            sessionManager.clearSession()
+            recreate()
+            return
+        }
+
+        if (usuario.primeiroAcesso) {
             // É primeiro acesso - ir para tela de reset de senha
             irParaResetPassword()
         } else {

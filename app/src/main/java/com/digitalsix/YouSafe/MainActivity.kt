@@ -84,10 +84,10 @@ class MainActivity : AppCompatActivity() {
 
     // Estado interno
     private var empresaSelecionada: EmpresaComUnidades? = null
-    private var unidadeIdSelecionada: Int? = null
+    private var unidadeUuidSelecionada: String? = null
     private var moduloSelecionado: moduloResponse? = null
     private var tipoModuloAtual: TipoModulo = TipoModulo.DESCONHECIDO
-    private var sessaoId: Int? = null
+    private var sessaoUuid: String? = null
     private val participantes = mutableListOf<ParticipanteSessao>()
     private val nfcsRegistrados = mutableListOf<String>()
     private var aulaInicioMs: Long = 0L
@@ -121,15 +121,19 @@ class MainActivity : AppCompatActivity() {
         val usuario = sessionManager.getUsuario()
         val token = sessionManager.getTokenWithBearer()
         if (usuario != null && token != null) {
-            textViewBemVindo.text = "Olá, ${usuario.nome}!"
-            val instrutorId = usuario.instrutorId ?: run {
+            textViewBemVindo.text = "Olá, ${usuario.nome ?: "usuário"}!"
+            val instrutorUuid = usuario.instrutorUuid ?: run {
                 Toast.makeText(this, "Usuário não possui perfil de instrutor.", Toast.LENGTH_SHORT).show()
-                irParaLogin()
+                encerrarSessaoEIrParaLogin()
                 return
             }
-            viewModel.carregarEmpresasEUnidades(token, instrutorId)
+            viewModel.carregarEmpresasEUnidades(
+                token = token,
+                instrutorId = instrutorUuid,
+                unidadesDoLogin = usuario.unidadesAtendidas.orEmpty()
+            )
         } else {
-            irParaLogin()
+            encerrarSessaoEIrParaLogin()
             return
         }
 
@@ -294,9 +298,9 @@ class MainActivity : AppCompatActivity() {
             val unidades = empresaSelecionada?.unidades ?: return@setOnItemClickListener
             if (position < unidades.size) {
                 val unidade = unidades[position]
-                unidadeIdSelecionada = unidade.unidadeId
+                unidadeUuidSelecionada = unidade.publicId
                 resetarSelecaoModulo()
-                carregarModulos(unidade.unidadeId)
+                carregarModulos(unidade.publicId)
             }
         }
 
@@ -319,14 +323,22 @@ class MainActivity : AppCompatActivity() {
         spinnerUnidade.setText("", false)
     }
 
-    private fun carregarModulos(unidadeId: Int) {
-        val unidade = empresaSelecionada?.unidades?.find { it.unidadeId == unidadeId } ?: return
-        viewModel.definirModulos(unidade.modulos)
+    private fun carregarModulos(unidadeUuid: String) {
+        val token = sessionManager.getTokenWithBearer() ?: return
+        viewModel.carregarTreinamentos(token, unidadeUuid)
+
+        val unidade = empresaSelecionada?.unidades?.find { it.publicId == unidadeUuid }
+        unidade?.let {
+            viewModel.definirModulos(it.modulos)
+            layoutSpinnerModule.isEnabled = true
+            spinnerModule.isEnabled = true
+        }
     }
 
     private fun resetarSelecaoUnidade() {
-        unidadeIdSelecionada = null
+        unidadeUuidSelecionada = null
         spinnerUnidade.setText("", false)
+        spinnerUnidade.setAdapter(null)
         layoutSpinnerUnidade.isEnabled = false
         spinnerUnidade.isEnabled = false
     }
@@ -335,6 +347,9 @@ class MainActivity : AppCompatActivity() {
         moduloSelecionado = null
         tipoModuloAtual = TipoModulo.DESCONHECIDO
         spinnerModule.setText("", false)
+        spinnerModule.setAdapter(null)
+        editTextNomeTreinamento.setText("", false)
+        editTextDescricaoAula.setText("")
         layoutSpinnerModule.isEnabled = false
         spinnerModule.isEnabled = false
         layoutTreinamentoFields.visibility = View.GONE
@@ -345,8 +360,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun detectarTipoModulo(modulo: moduloResponse): TipoModulo {
-        val abrev = modulo.abreviacao.uppercase()
-        val nome = modulo.nome.uppercase()
+        val abrev = modulo.abreviacao.orEmpty().uppercase()
+        val nome = modulo.nome.orEmpty().uppercase()
         return when {
             abrev.contains("GL") || nome.contains("GINASTICA") || nome.contains("LABORAL") -> TipoModulo.GINASTICA_LABORAL
             abrev.contains("TR") || nome.contains("TREINAMENTO") -> TipoModulo.TREINAMENTO
@@ -366,8 +381,8 @@ class MainActivity : AppCompatActivity() {
                 textViewDescricaoLabel.visibility = View.GONE
                 layoutDescricaoAula.visibility = View.GONE
                 val token = sessionManager.getTokenWithBearer() ?: return
-                val unidadeId = unidadeIdSelecionada ?: return
-                viewModel.carregarTreinamentosSeNecessario(token, unidadeId)
+                val unidadeUuid = unidadeUuidSelecionada ?: return
+                viewModel.carregarTreinamentosSeNecessario(token, unidadeUuid)
             }
             TipoModulo.DESCONHECIDO -> {
                 layoutTreinamentoFields.visibility = View.GONE
@@ -391,11 +406,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (state.modulos.isNotEmpty()) {
-                val nomes = state.modulos.map { it.nome }
+                val nomes = state.modulos.map { it.nome.orEmpty() }
                 val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, nomes)
                 spinnerModule.setAdapter(adapter)
-                layoutSpinnerModule.isEnabled = true
-                spinnerModule.isEnabled = true
             }
 
             if (state.treinamentos.isNotEmpty()) {
@@ -417,12 +430,12 @@ class MainActivity : AppCompatActivity() {
                     buttonIniciarAula.text = "Iniciando..."
                 }
                 is AcaoState.Sucesso -> {
-                    val id = state.sessaoId ?: return@observe
-                    sessaoId = id
+                    val uuid = state.sessaoId ?: return@observe
+                    sessaoUuid = uuid
                     aulaInicioMs = System.currentTimeMillis()
-                    sessionManager.salvarAulaEmProgresso(id)
+                    sessionManager.salvarAulaEmProgresso(uuid)
                     sessionManager.salvarInicioAulaEmProgresso(aulaInicioMs)
-                    unidadeIdSelecionada?.let { sessionManager.salvarUnidadeEmProgresso(it) }
+                    unidadeUuidSelecionada?.let { sessionManager.salvarUnidadeEmProgresso(it) }
                     sessionManager.salvarModuloEmProgresso(moduloSelecionado?.nome)
                     mostrarEstadoNFC()
                     viewModel.consumirCriarSessaoEstado()
@@ -477,13 +490,12 @@ class MainActivity : AppCompatActivity() {
                 is AcaoState.Sucesso -> {
                     val nfc = nfcPendente ?: return@observe
                     val funcionario = viewModel.funcionarioValidado.value
-                    val unidadeId = unidadeIdSelecionada ?: return@observe
+                    val unidadeUuid = unidadeUuidSelecionada ?: return@observe
                     val participante = ParticipanteSessao(
                         nfc = nfc,
-                        unidadeId = unidadeId.toString(),
-                        funcionarioId = funcionario?.funcionario_id,
+                        unidadeId = unidadeUuid,
+                        funcionarioId = funcionario?.publicId,
                         nome = funcionario?.nome,
-                        ativo = funcionario?.ativo,
                         horarioRegistro = obterTimestampUtc()
                     )
                     participantes.add(participante)
@@ -521,11 +533,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val usuario = sessionManager.getUsuario() ?: return
-        val instrutorId = usuario.instrutorId ?: run {
+        val instrutorUuid = usuario.instrutorUuid ?: run {
             Toast.makeText(this, "Usuário não possui perfil de instrutor.", Toast.LENGTH_SHORT).show()
+            encerrarSessaoEIrParaLogin()
             return
         }
-        val unidadeId = unidadeIdSelecionada ?: run {
+        val unidadeUuid = unidadeUuidSelecionada ?: run {
             Toast.makeText(this, "Selecione uma unidade.", Toast.LENGTH_SHORT).show()
             return
         }
@@ -536,7 +549,7 @@ class MainActivity : AppCompatActivity() {
 
         val descricao: String
         val nomeTreinamento: String
-        val treinamentoId: Int?
+        val treinamentoUuid: String?
 
         when (tipoModuloAtual) {
             TipoModulo.GINASTICA_LABORAL -> {
@@ -546,7 +559,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 nomeTreinamento = ""
-                treinamentoId = null
+                treinamentoUuid = null
             }
             TipoModulo.TREINAMENTO -> {
                 val nomeDigitado = editTextNomeTreinamento.text?.toString()?.trim() ?: ""
@@ -556,7 +569,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 val existente = viewModel.uiState.value?.treinamentos
                     ?.find { it.nome.equals(nomeDigitado, ignoreCase = true) }
-                treinamentoId = existente?.treinamentoId
+                treinamentoUuid = existente?.publicId
                 nomeTreinamento = nomeDigitado
                 descricao = nomeDigitado
             }
@@ -571,17 +584,20 @@ class MainActivity : AppCompatActivity() {
             tipoModulo = tipoModuloAtual,
             nomeTreinamento = nomeTreinamento,
             descricao = descricao,
-            unidadeId = unidadeId,
-            instrutorId = instrutorId,
-            moduloId = modulo.id,
-            treinamentoSelecionadoId = treinamentoId
+            unidadeId = unidadeUuid,
+            instrutorId = instrutorUuid,
+            moduloId = modulo.publicId ?: run {
+                Toast.makeText(this, "Módulo sem UUID.", Toast.LENGTH_SHORT).show()
+                return
+            },
+            treinamentoSelecionadoId = treinamentoUuid
         )
     }
 
     private fun confirmarAula() {
         val token = sessionManager.getTokenWithBearer() ?: return
-        val id = sessaoId ?: return
-        viewModel.confirmarSessao(token, id, obterTimestampUtc(), participantes.toList())
+        val uuid = sessaoUuid ?: return
+        viewModel.confirmarSessao(token, uuid, obterTimestampUtc(), participantes.toList())
     }
 
     private fun abortarAula() {
@@ -590,8 +606,8 @@ class MainActivity : AppCompatActivity() {
             .setMessage("Deseja abortar a aula? Os dados registrados serão descartados.")
             .setPositiveButton("Abortar") { _, _ ->
                 val token = sessionManager.getTokenWithBearer() ?: return@setPositiveButton
-                val id = sessaoId ?: return@setPositiveButton
-                viewModel.abortarSessao(token, id, obterTimestampUtc(), participantes.toList())
+                val uuid = sessaoUuid ?: return@setPositiveButton
+                viewModel.abortarSessao(token, uuid, obterTimestampUtc(), participantes.toList())
             }
             .setNegativeButton("Cancelar", null)
             .show()
@@ -611,7 +627,7 @@ class MainActivity : AppCompatActivity() {
         nfcPendente = null
         atualizarListaNFCs()
 
-        val unidade = empresaSelecionada?.unidades?.find { it.unidadeId == unidadeIdSelecionada }
+        val unidade = empresaSelecionada?.unidades?.find { it.publicId == unidadeUuidSelecionada }
         textViewDescricaoAtual.text = moduloSelecionado?.nome ?: sessionManager.getModuloEmProgresso() ?: ""
         textViewUnidadeAtual.text = "Unidade: ${unidade?.unidadeNome ?: ""}"
 
@@ -625,11 +641,19 @@ class MainActivity : AppCompatActivity() {
         atualizarVisibilidadeLogout(true)
         desativarNFC()
         pararTimer()
-        sessaoId = null
+        limparSelecaoNovaAtividade()
+        sessaoUuid = null
         participantes.clear()
         nfcsRegistrados.clear()
         filaNfcsPendentes.clear()
         nfcPendente = null
+    }
+
+    private fun limparSelecaoNovaAtividade() {
+        empresaSelecionada = null
+        spinnerEmpresa.setText("", false)
+        resetarSelecaoUnidade()
+        resetarSelecaoModulo()
     }
 
     private fun atualizarVisibilidadeLogout(exibir: Boolean) {
@@ -687,9 +711,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun iniciarValidacaoNfc(nfc: String) {
         val token = sessionManager.getTokenWithBearer() ?: return
-        val unidadeId = unidadeIdSelecionada ?: return
+        val unidadeUuid = unidadeUuidSelecionada ?: return
         nfcPendente = nfc
-        viewModel.validarNFC(token, nfc, unidadeId)
+        viewModel.validarNFC(token, nfc, unidadeUuid)
     }
 
     private fun validarProximoNfcDaFila() {
@@ -764,11 +788,11 @@ class MainActivity : AppCompatActivity() {
     // ==========================================
 
     private fun verificarAulaEmProgresso() {
-        val aulaId = sessionManager.getAulaEmProgresso() ?: return
+        val aulaUuid = sessionManager.getAulaEmProgresso() ?: return
         val inicioMs = sessionManager.getInicioAulaEmProgresso() ?: return
-        sessaoId = aulaId
+        sessaoUuid = aulaUuid
         aulaInicioMs = inicioMs
-        unidadeIdSelecionada = sessionManager.getUnidadeEmProgresso()
+        unidadeUuidSelecionada = sessionManager.getUnidadeEmProgresso()
         textViewDescricaoAtual.text = sessionManager.getModuloEmProgresso() ?: ""
         textViewUnidadeAtual.text = ""
         mostrarEstadoNFC()
@@ -795,5 +819,10 @@ class MainActivity : AppCompatActivity() {
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
+    }
+
+    private fun encerrarSessaoEIrParaLogin() {
+        sessionManager.clearSession()
+        irParaLogin()
     }
 }

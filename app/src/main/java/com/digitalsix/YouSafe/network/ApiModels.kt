@@ -22,10 +22,7 @@ data class ForgotPasswordResponse(
 
 data class ResetPasswordRequest(
     @SerializedName("senha")
-    val senha: String,
-
-    @SerializedName("confirmSenha")
-    val confirmSenha: String
+    val senha: String
 )
 
 data class ResetPasswordResponse(
@@ -59,15 +56,21 @@ data class TreinamentoRequest(
     val obrigatorio: Boolean,
 
     @SerializedName("unidade_id")
-    val unidadeId: Int,
+    val unidadeId: String,
 
-    @SerializedName("categorias_id")
-    val categoriasId: List<Int>
+    @SerializedName("categorias")
+    val categorias: List<String>,
+
+    @SerializedName("participantes")
+    val participantes: List<String> = emptyList()
 )
 
 data class TreinamentoResponse(
     @SerializedName("treinamento_id")
     val treinamentoId: Int,
+
+    @SerializedName("public_id")
+    val publicId: String,
 
     @SerializedName("nome")
     val nome: String,
@@ -80,25 +83,25 @@ data class TreinamentoResponse(
 
 data class SessaoRequest(
     @SerializedName("unidade_id")
-    val unidadeId: Int,
+    val unidadeId: String,
 
     @SerializedName("instrutor_id")
-    val instrutorId: Int,
+    val instrutorId: String,
 
     @SerializedName("status_id")
-    val statusId: Int,
+    val statusId: String?,
 
     @SerializedName("data_inicio")
     val dataInicio: String,
 
     @SerializedName("treinamento_id")
-    val treinamentoId: Int?,
+    val treinamentoId: String?,
 
     @SerializedName("ginastica_laboral_id")
-    val ginasticaLaboralId: Int?,
+    val ginasticaLaboralId: String?,
 
     @SerializedName("modulo_id")
-    val moduloId: Int,
+    val moduloId: String,
 
     @SerializedName("observacoes")
     val observacoes: String
@@ -109,7 +112,10 @@ data class IdResponse(
         value = "id",
         alternate = ["treinamento_id", "ginastica_laboral_id", "sessao_id", "aula_id"]
     )
-    val id: Int?
+    val id: String?,
+
+    @SerializedName("public_id")
+    val publicId: String? = null
 )
 
 // ==========================================
@@ -121,7 +127,7 @@ data class CriarAulaRequest(
     val descricao: String,
 
     @SerializedName("unidade_id")
-    val unidadeId: Int,
+    val unidadeId: String,
 
     @SerializedName("data")
     val data: String? = null  // ISO 8601 format, opcional
@@ -137,22 +143,25 @@ data class CriarAulaResponse(
 
 data class AulaInfo(
     @SerializedName("aula_id")
-    val aulaId: Int,
+    val aulaId: Int?,
+
+    @SerializedName("public_id")
+    val publicId: String?,
 
     @SerializedName("data")
     val data: String,
 
     @SerializedName("unidade_id")
-    val unidadeId: Int,
+    val unidadeId: String?,
 
     @SerializedName("tipo_aula_id")
     val tipoAulaId: Int?,
 
     @SerializedName("instrutor_id")
-    val instrutorId: Int,
+    val instrutorId: String?,
 
     @SerializedName("status_id")
-    val statusId: Int  // 4 = em progresso, 1 = confirmada, 2 = abortada
+    val statusId: String?
 )
 
 // ==========================================
@@ -175,7 +184,7 @@ data class ParticipanteSessao(
     val unidadeId: String,
 
     @SerializedName("funcionario_id")
-    val funcionarioId: Int? = null,
+    val funcionarioId: String? = null,
 
     @SerializedName("nome")
     val nome: String? = null,
@@ -221,21 +230,21 @@ data class LoginRequest(
 
 data class LoginResponse(
     @SerializedName("message")
-    val message: String,
+    val message: String? = null,
 
     @SerializedName("token")
     val token: String,
 
     @SerializedName("expires_in")
-    val expiresIn: String,
+    val expiresIn: String? = null,
 
-    @SerializedName("refresh_token")
+    @SerializedName(value = "refreshToken", alternate = ["refresh_token"])
     val refreshToken: String? = null,
 
     @SerializedName("refresh_expires_at")
     val refreshExpiresAt: String? = null,
 
-    @SerializedName("usuario")
+    @SerializedName(value = "user", alternate = ["usuario"])
     val usuario: Usuario
 )
 
@@ -248,31 +257,51 @@ data class Usuario(
     @SerializedName("id")
     val id: Int,
 
+    @SerializedName(value = "public_id", alternate = ["publicId", "uuid"])
+    val publicId: String? = null,
+
     @SerializedName("nome")
-    val nome: String,
+    val nome: String? = null,
 
     @SerializedName("email")
-    val email: String,
+    val email: String? = null,
 
     @SerializedName("unidade_id")
-    val unidadeId: Int,
+    val unidadeId: Int? = null,
 
-    // ✅ ADICIONE ESTE CAMPO
+    @SerializedName("unidade_public_id")
+    val unidadePublicId: String? = null,
+
     @SerializedName("empresa_id")
-    val empresaId: Int,
+    val empresaId: Int? = null,
 
     @SerializedName("primeiro_acesso")
-    val primeiroAcesso: Boolean,
+    val primeiroAcesso: Boolean = false,
 
     @SerializedName("roles")
-    val roles: List<Role>,
+    val roles: List<Role> = emptyList(),
 
     @SerializedName("instrutor_id")
-    val instrutorId: Int?,
+    val instrutorId: Int? = null,
+
+    @SerializedName(
+        value = "instrutor_public_id",
+        alternate = ["instrutorPublicId", "instrutor_uuid", "instrutor_public_uuid"]
+    )
+    val instrutorPublicId: String? = null,
 
     @SerializedName("unidades_atendidas")
-    val unidadesAtendidas: List<UnidadeAtendida>
-)
+    val unidadesAtendidas: List<UnidadeAtendida>? = null,
+
+    @SerializedName("unidades_ids")
+    val unidadesIds: List<Int>? = null,
+
+    @SerializedName("unidades_public_ids")
+    val unidadesPublicIds: List<String>? = null
+) {
+    val instrutorUuid: String?
+        get() = instrutorPublicId ?: publicId
+}
 
 data class Instrutor(
     @SerializedName("id")
@@ -280,8 +309,11 @@ data class Instrutor(
 )
 
 data class Role(
-    @SerializedName("id")
-    val id: Int,
+    @SerializedName(value = "role_id", alternate = ["id"])
+    val id: Int? = null,
+
+    @SerializedName("public_id")
+    val publicId: String? = null,
 
     @SerializedName("nome")
     val nome: String
@@ -289,13 +321,19 @@ data class Role(
 
 data class UnidadeAtendida(
     @SerializedName(value = "id", alternate = ["unidade_id"])
-    val id: Int,
+    val id: Int? = null,
+
+    @SerializedName(value = "public_id", alternate = ["publicId", "uuid"])
+    val publicId: String? = null,
 
     @SerializedName("nome")
-    val nome: String,
+    val nome: String? = null,
 
     @SerializedName("empresa")
-    val empresa: String?
+    val empresa: String?,
+
+    @SerializedName("modulos")
+    val modulos: List<com.digitalsix.YouSafe.network.modulos.moduloResponse>? = null
 )
 
 // ==========================================
@@ -304,27 +342,30 @@ data class UnidadeAtendida(
 
 data class UnidadeAtendidaDetalhe(
     @SerializedName("id")
-    val id: Int,
+    val id: Int? = null,
+
+    @SerializedName(value = "public_id", alternate = ["publicId", "uuid"])
+    val publicId: String? = null,
 
     @SerializedName("nome")
-    val nome: String,
+    val nome: String? = null,
 
     @SerializedName("empresa")
-    val empresa: String,
+    val empresa: String?,
 
     @SerializedName("modulos")
-    val modulos: List<com.digitalsix.YouSafe.network.modulos.moduloResponse>
+    val modulos: List<com.digitalsix.YouSafe.network.modulos.moduloResponse>? = null
 )
 
 data class InstrutorUnidadesResponse(
     @SerializedName("instrutor_id")
-    val instrutorId: Int,
+    val instrutorId: Int? = null,
 
     @SerializedName("usuario_id")
-    val usuarioId: Int,
+    val usuarioId: Int? = null,
 
-    @SerializedName("unidades_atendidas")
-    val unidadesAtendidas: List<UnidadeAtendidaDetalhe>
+    @SerializedName(value = "unidades", alternate = ["unidades_atendidas"])
+    val unidades: List<UnidadeAtendidaDetalhe>? = null
 )
 
 // ==========================================
@@ -343,6 +384,9 @@ data class TipoAula(
 data class GetFuncionarioByNFCResponse(
     @SerializedName("funcionario_id")
     val funcionario_id: Int?,
+
+    @SerializedName("public_id")
+    val publicId: String?,
 
     @SerializedName("nome")
     val nome: String?,

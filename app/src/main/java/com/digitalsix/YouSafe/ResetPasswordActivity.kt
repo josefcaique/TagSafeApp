@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
  * 1. Usuário faz login
  * 2. Se primeiro_acesso == true, é redirecionado para esta tela
  * 3. Define nova senha
- * 4. Senha é atualizada via POST /auth/resetSenha/:id
+ * 4. Senha é atualizada via POST /auth/resetSenha/:uuid
  * 5. Redireciona para MainActivity
  */
 class ResetPasswordActivity : AppCompatActivity() {
@@ -65,7 +65,7 @@ class ResetPasswordActivity : AppCompatActivity() {
             val confirmarSenha = inputConfirmarSenha.text.toString().trim()
 
             if (validarSenhas(novaSenha, confirmarSenha)) {
-                resetarSenha(novaSenha, confirmarSenha)
+                resetarSenha(novaSenha)
             }
         }
     }
@@ -104,9 +104,13 @@ class ResetPasswordActivity : AppCompatActivity() {
         }
     }
 
-    private fun resetarSenha(senha: String, confirmSenha: String) {
+    private fun resetarSenha(senha: String) {
         val usuario = sessionManager.getUsuario() ?: return
-        val token = sessionManager.getToken() ?: return
+        val token = sessionManager.getTokenWithBearer() ?: return
+        val usuarioUuid = usuario.publicId ?: run {
+            Toast.makeText(this, "Usuário sem UUID para redefinir senha.", Toast.LENGTH_LONG).show()
+            return
+        }
 
         buttonConfirmar.isEnabled = false
         buttonConfirmar.text = "Aguarde..."
@@ -114,13 +118,12 @@ class ResetPasswordActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val request = ResetPasswordRequest(
-                    senha = senha,
-                    confirmSenha = confirmSenha
+                    senha = senha
                 )
 
                 val response = RetrofitInstance.api.resetPassword(
-                    token = sessionManager.getTokenWithBearer()!!,
-                    userId = usuario.id,
+                    token = token,
+                    userUuid = usuarioUuid,
                     request = request
                 )
 

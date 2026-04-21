@@ -11,6 +11,9 @@ data class EmpresaUnidadeResponse(
     @SerializedName("unidade_id")
     val unidadeId: Int,
 
+    @SerializedName("public_id")
+    val publicId: String,
+
     @SerializedName("nome")
     val nomeEmpresa: String,
 

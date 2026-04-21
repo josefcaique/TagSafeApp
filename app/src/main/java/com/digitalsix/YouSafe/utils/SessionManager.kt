@@ -21,8 +21,8 @@ class SessionManager(context: Context) {
         private const val KEY_REFRESH_EXPIRES_AT = "refresh_expires_at"
         private const val KEY_USUARIO = "usuario"
         private const val KEY_LOGGED_IN = "is_logged_in"
-        private const val KEY_AULA_EM_PROGRESSO = "aula_em_progresso"
-        private const val KEY_UNIDADE_EM_PROGRESSO = "unidade_em_progresso"
+        private const val KEY_AULA_EM_PROGRESSO = "aula_em_progresso_uuid"
+        private const val KEY_UNIDADE_EM_PROGRESSO = "unidade_em_progresso_uuid"
         private const val KEY_MODULO_EM_PROGRESSO = "modulo_em_progresso"
         private const val KEY_AULA_INICIO_MS = "aula_inicio_ms"
     }
@@ -138,12 +138,12 @@ class SessionManager(context: Context) {
     // ==========================================
 
     /**
-     * Salvar ID da aula em progresso
+     * Salvar UUID da aula em progresso
      * Chamado quando instrutor inicia uma aula
      */
-    fun salvarAulaEmProgresso(aulaId: Int) {
+    fun salvarAulaEmProgresso(aulaUuid: String) {
         val editor = prefs.edit()
-        editor.putInt(KEY_AULA_EM_PROGRESSO, aulaId)
+        editor.putString(KEY_AULA_EM_PROGRESSO, aulaUuid)
         editor.apply()
     }
 
@@ -154,12 +154,11 @@ class SessionManager(context: Context) {
     }
 
     /**
-     * Obter ID da aula em progresso (se existir)
+     * Obter UUID da aula em progresso (se existir)
      * Retorna null se não houver aula em progresso
      */
-    fun getAulaEmProgresso(): Int? {
-        val aulaId = prefs.getInt(KEY_AULA_EM_PROGRESSO, -1)
-        return if (aulaId == -1) null else aulaId
+    fun getAulaEmProgresso(): String? {
+        return prefs.getString(KEY_AULA_EM_PROGRESSO, null)
     }
 
     fun getInicioAulaEmProgresso(): Long? {
@@ -167,15 +166,14 @@ class SessionManager(context: Context) {
         return if (inicioMs == -1L) null else inicioMs
     }
 
-    fun salvarUnidadeEmProgresso(unidadeId: Int) {
+    fun salvarUnidadeEmProgresso(unidadeUuid: String) {
         val editor = prefs.edit()
-        editor.putInt(KEY_UNIDADE_EM_PROGRESSO, unidadeId)
+        editor.putString(KEY_UNIDADE_EM_PROGRESSO, unidadeUuid)
         editor.apply()
     }
 
-    fun getUnidadeEmProgresso(): Int? {
-        val unidadeId = prefs.getInt(KEY_UNIDADE_EM_PROGRESSO, -1)
-        return if (unidadeId == -1) null else unidadeId
+    fun getUnidadeEmProgresso(): String? {
+        return prefs.getString(KEY_UNIDADE_EM_PROGRESSO, null)
     }
 
     fun salvarModuloEmProgresso(moduloNome: String?) {

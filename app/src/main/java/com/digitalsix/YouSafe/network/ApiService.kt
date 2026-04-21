@@ -28,10 +28,10 @@ interface ApiService {
     @POST("auth/logout")
     suspend fun logout(@Header("Authorization") token: String): Response<Any>
 
-    @POST("auth/resetSenha/{id}")
+    @POST("auth/resetSenha/{uuid}")
     suspend fun resetPassword(
         @Header("Authorization") token: String,
-        @Path("id") userId: Int,
+        @Path("uuid") userUuid: String,
         @Body request: ResetPasswordRequest
     ): Response<ResetPasswordResponse>
 
@@ -57,17 +57,17 @@ interface ApiService {
         @Body request: SessaoRequest
     ): Response<JsonElement>
 
-    @POST("sessoes/{id}/confirmar")
+    @POST("sessoes/{uuid}/confirmar")
     suspend fun confirmarSessao(
         @Header("Authorization") token: String,
-        @Path("id") aulaId: Int,
+        @Path("uuid") sessaoUuid: String,
         @Body request: ConfirmarSessaoRequest
     ): Response<Any>
 
-    @POST("sessoes/{id}/abortar")
+    @POST("sessoes/{uuid}/abortar")
     suspend fun abortarSessao(
         @Header("Authorization") token: String,
-        @Path("id") aulaId: Int,
+        @Path("uuid") sessaoUuid: String,
         @Body request: AbortarAulaRequest
     ): Response<AbortarAulaResponse>
 
@@ -79,8 +79,8 @@ interface ApiService {
 
     @GET("modulos/instrutor/{instrutorId}/unidade/{unidadeId}")
     suspend fun getModulosByInstrutorAndUnidade(
-        @Path("instrutorId") instrutorId: Int,
-        @Path("unidadeId") unidadeId: Int
+        @Path("instrutorId") instrutorId: String,
+        @Path("unidadeId") unidadeId: String
     ): Response<List<moduloResponse>>
 
     // ==========================================
@@ -94,19 +94,19 @@ interface ApiService {
     @GET("instrutores/unidades-atendidas/{instrutorId}")
     suspend fun getUnidadesAtendidasPorInstrutor(
         @Header("Authorization") token: String,
-        @Path("instrutorId") instrutorId: Int
+        @Path("instrutorId") instrutorId: String
     ): Response<InstrutorUnidadesResponse>
 
     @GET("funcionarios/nfc/{nfc}/unidade/{unidadeId}")
     suspend fun getFuncionarioByNFC(
         @Header("Authorization") token: String,
         @Path("nfc") nfc: String,
-        @Path("unidadeId") unidadeId: Int
+        @Path("unidadeId") unidadeId: String
     ): Response<GetFuncionarioByNFCResponse>
 
     @GET("treinamentos/unidade/{unidadeId}")
     suspend fun getTreinamentosByUnidade(
         @Header("Authorization") token: String,
-        @Path("unidadeId") unidadeId: Int
+        @Path("unidadeId") unidadeId: String
     ): Response<List<TreinamentoResponse>>
 }

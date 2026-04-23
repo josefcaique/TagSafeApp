@@ -2,6 +2,7 @@ package com.digitalsix.YouSafe.network
 
 import com.digitalsix.YouSafe.network.modulos.moduloResponse
 import com.google.gson.JsonElement
+import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -15,7 +16,12 @@ interface ApiService {
     @POST("auth/refresh")
     suspend fun refreshToken(
         @Body request: RefreshTokenRequest
-    ): Response<LoginResponse>
+    ): Response<RefreshTokenResponse>
+
+    @POST("auth/refresh")
+    fun refreshTokenSync(
+        @Body request: RefreshTokenRequest
+    ): Call<RefreshTokenResponse>
 
     @POST("auth/forgot-password")
     suspend fun forgotPassword(

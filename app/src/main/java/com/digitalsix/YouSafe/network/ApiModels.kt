@@ -253,6 +253,17 @@ data class RefreshTokenRequest(
     val refreshToken: String
 )
 
+data class RefreshTokenResponse(
+    @SerializedName("token")
+    val token: String,
+
+    @SerializedName(value = "refreshToken", alternate = ["refresh_token"])
+    val refreshToken: String? = null,
+
+    @SerializedName("refresh_expires_at")
+    val refreshExpiresAt: String? = null
+)
+
 data class Usuario(
     @SerializedName("id")
     val id: Int,

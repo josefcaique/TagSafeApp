@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -32,6 +33,7 @@ import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.RetrofitInstance
 import com.digitalsix.YouSafe.network.modulos.moduloResponse
 import com.digitalsix.YouSafe.repository.MainRepository
+import com.digitalsix.YouSafe.utils.AtividadeEmProgresso
 import com.digitalsix.YouSafe.utils.SessionManager
 import com.digitalsix.YouSafe.viewmodel.AcaoState
 import com.digitalsix.YouSafe.viewmodel.MainViewModel
@@ -55,6 +57,13 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mainScrollView: ScrollView
     private lateinit var statusBarScrim: View
+
+    // Views — Estado 0: Sessões abertas
+    private lateinit var layoutSessoes: MaterialCardView
+    private lateinit var textViewResumoSessoes: TextView
+    private lateinit var layoutListaSessoes: LinearLayout
+    private lateinit var buttonNovaAtividade: MaterialButton
+    private lateinit var buttonVoltarSessoesCriacao: MaterialButton
 
     // Views — Estado 1: Criação de Aula
     private lateinit var toolbar: MaterialToolbar
@@ -80,6 +89,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textViewContador: TextView
     private lateinit var buttonConfirmarAula: MaterialButton
     private lateinit var buttonAbortarAula: MaterialButton
+    private lateinit var buttonVoltarSessoesNFC: MaterialButton
     private lateinit var textViewDuracaoAula: TextView
 
     // Estado interno
@@ -102,6 +112,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        RetrofitInstance.initialize(applicationContext)
         configurarBarraStatus()
 
         sessionManager = SessionManager(this)
@@ -137,7 +148,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        verificarAulaEmProgresso()
+        mostrarTelaSessoes()
     }
 
     // ==========================================
@@ -149,6 +160,11 @@ class MainActivity : AppCompatActivity() {
         statusBarScrim = findViewById(R.id.statusBarScrim)
         toolbar = findViewById(R.id.toolbar)
         textViewBemVindo = findViewById(R.id.textViewBemVindo)
+        layoutSessoes = findViewById(R.id.layoutSessoes)
+        textViewResumoSessoes = findViewById(R.id.textViewResumoSessoes)
+        layoutListaSessoes = findViewById(R.id.layoutListaSessoes)
+        buttonNovaAtividade = findViewById(R.id.buttonNovaAtividade)
+        buttonVoltarSessoesCriacao = findViewById(R.id.buttonVoltarSessoesCriacao)
         layoutCriacaoAula = findViewById(R.id.layoutCriacaoAula)
         spinnerEmpresa = findViewById(R.id.spinnerEmpresa)
         spinnerUnidade = findViewById(R.id.spinnerUnidade)
@@ -168,6 +184,7 @@ class MainActivity : AppCompatActivity() {
         textViewContador = findViewById(R.id.textViewContador)
         buttonConfirmarAula = findViewById(R.id.buttonConfirmarAula)
         buttonAbortarAula = findViewById(R.id.buttonAbortarAula)
+        buttonVoltarSessoesNFC = findViewById(R.id.buttonVoltarSessoesNFC)
         textViewDuracaoAula = findViewById(R.id.textViewDuracaoAula)
     }
 
@@ -437,7 +454,16 @@ class MainActivity : AppCompatActivity() {
                     sessionManager.salvarInicioAulaEmProgresso(aulaInicioMs)
                     unidadeUuidSelecionada?.let { sessionManager.salvarUnidadeEmProgresso(it) }
                     sessionManager.salvarModuloEmProgresso(moduloSelecionado?.nome)
-                    mostrarEstadoNFC()
+                    sessionManager.salvarAtividadeEmProgresso(
+                        AtividadeEmProgresso(
+                            uuid = uuid,
+                            inicioMs = aulaInicioMs,
+                            unidadeUuid = unidadeUuidSelecionada,
+                            unidadeNome = obterNomeUnidadeAtual(),
+                            moduloNome = moduloSelecionado?.nome
+                        )
+                    )
+                    mostrarEstadoNFC(limparParticipantes = true)
                     viewModel.consumirCriarSessaoEstado()
                 }
                 is AcaoState.Erro -> {
@@ -456,9 +482,10 @@ class MainActivity : AppCompatActivity() {
         viewModel.confirmarSessaoState.observe(this) { state ->
             when (state) {
                 is AcaoState.Sucesso -> {
-                    limparAulaEmProgresso()
-                    Toast.makeText(this, "Aula confirmada com sucesso!", Toast.LENGTH_SHORT).show()
-                    mostrarEstadoCriacao()
+                    val uuidFinalizada = sessaoUuid
+                    limparAulaEmProgresso(uuidFinalizada)
+                    Toast.makeText(this, "Atividade confirmada com sucesso!", Toast.LENGTH_SHORT).show()
+                    mostrarTelaSessoes()
                     viewModel.consumirConfirmarSessaoEstado()
                 }
                 is AcaoState.Erro -> {
@@ -472,9 +499,10 @@ class MainActivity : AppCompatActivity() {
         viewModel.abortarSessaoState.observe(this) { state ->
             when (state) {
                 is AcaoState.Sucesso -> {
-                    limparAulaEmProgresso()
-                    Toast.makeText(this, "Aula abortada.", Toast.LENGTH_SHORT).show()
-                    mostrarEstadoCriacao()
+                    val uuidAbortada = sessaoUuid
+                    limparAulaEmProgresso(uuidAbortada)
+                    Toast.makeText(this, "Atividade abortada.", Toast.LENGTH_SHORT).show()
+                    mostrarTelaSessoes()
                     viewModel.consumirAbortarSessaoEstado()
                 }
                 is AcaoState.Erro -> {
@@ -500,6 +528,7 @@ class MainActivity : AppCompatActivity() {
                     )
                     participantes.add(participante)
                     nfcsRegistrados.add(nfc)
+                    sessaoUuid?.let { sessionManager.atualizarParticipantesAtividade(it, participantes.toList()) }
                     nfcPendente = null
                     atualizarListaNFCs()
                     viewModel.consumirValidarNFCEstado()
@@ -521,6 +550,9 @@ class MainActivity : AppCompatActivity() {
     // ==========================================
 
     private fun configurarBotoes() {
+        buttonNovaAtividade.setOnClickListener { mostrarEstadoCriacao() }
+        buttonVoltarSessoesCriacao.setOnClickListener { mostrarTelaSessoes() }
+        buttonVoltarSessoesNFC.setOnClickListener { mostrarTelaSessoes() }
         buttonIniciarAula.setOnClickListener { iniciarAula() }
         buttonConfirmarAula.setOnClickListener { confirmarAula() }
         buttonAbortarAula.setOnClickListener { abortarAula() }
@@ -602,8 +634,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun abortarAula() {
         AlertDialog.Builder(this)
-            .setTitle("Abortar Aula")
-            .setMessage("Deseja abortar a aula? Os dados registrados serão descartados.")
+            .setTitle("Abortar atividade")
+            .setMessage("Deseja abortar a atividade? Os dados registrados serão descartados.")
             .setPositiveButton("Abortar") { _, _ ->
                 val token = sessionManager.getTokenWithBearer() ?: return@setPositiveButton
                 val uuid = sessaoUuid ?: return@setPositiveButton
@@ -617,25 +649,146 @@ class MainActivity : AppCompatActivity() {
     // ESTADOS DE TELA
     // ==========================================
 
-    private fun mostrarEstadoNFC() {
+    private fun mostrarTelaSessoes() {
+        salvarAtividadeAtual()
+        layoutLeituraNFC.visibility = View.GONE
+        layoutCriacaoAula.visibility = View.GONE
+        layoutSessoes.visibility = View.VISIBLE
+        atualizarVisibilidadeLogout(true)
+        desativarNFC()
+        pararTimer()
+        atualizarListaSessoes()
+    }
+
+    private fun atualizarListaSessoes() {
+        val atividades = sessionManager.getAtividadesEmProgresso()
+        layoutListaSessoes.removeAllViews()
+
+        textViewResumoSessoes.text = if (atividades.isEmpty()) {
+            "Nenhuma sessão aberta no momento."
+        } else {
+            "${atividades.size} sessão(ões) em andamento."
+        }
+
+        atividades.forEach { atividade ->
+            layoutListaSessoes.addView(criarCardSessao(atividade))
+        }
+    }
+
+    private fun criarCardSessao(atividade: AtividadeEmProgresso): View {
+        val density = resources.displayMetrics.density
+        val card = MaterialCardView(this).apply {
+            radius = 16f * density
+            cardElevation = 0f
+            setCardBackgroundColor(getColor(R.color.surface_variant))
+            strokeWidth = (1 * density).toInt()
+            strokeColor = getColor(R.color.divider)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = (12 * density).toInt()
+            }
+        }
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                (16 * density).toInt(),
+                (16 * density).toInt(),
+                (16 * density).toInt(),
+                (16 * density).toInt()
+            )
+        }
+
+        val titulo = TextView(this).apply {
+            text = atividade.moduloNome?.takeIf { it.isNotBlank() } ?: "Atividade em andamento"
+            setTextColor(getColor(R.color.text_primary))
+            textSize = 18f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+        val unidade = TextView(this).apply {
+            text = "Unidade: ${atividade.unidadeNome?.takeIf { it.isNotBlank() } ?: "não informada"}"
+            setTextColor(getColor(R.color.text_secondary))
+            textSize = 14f
+        }
+        val inicio = TextView(this).apply {
+            text = "Início: ${formatarDataLocal(atividade.inicioMs)}"
+            setTextColor(getColor(R.color.text_secondary))
+            textSize = 14f
+        }
+        val participantes = TextView(this).apply {
+            text = "Participantes registrados: ${atividade.participantes.size}"
+            setTextColor(getColor(R.color.text_secondary))
+            textSize = 14f
+        }
+        val continuar = MaterialButton(this).apply {
+            text = "Continuar"
+            setTextColor(getColor(R.color.white))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.turquoise))
+            cornerRadius = (12 * density).toInt()
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (52 * density).toInt()
+            ).apply {
+                topMargin = (12 * density).toInt()
+            }
+            setOnClickListener { abrirAtividade(atividade) }
+        }
+
+        content.addView(titulo)
+        content.addView(unidade)
+        content.addView(inicio)
+        content.addView(participantes)
+        content.addView(continuar)
+        card.addView(content)
+        return card
+    }
+
+    private fun abrirAtividade(atividade: AtividadeEmProgresso) {
+        sessaoUuid = atividade.uuid
+        aulaInicioMs = atividade.inicioMs
+        unidadeUuidSelecionada = atividade.unidadeUuid
+        empresaSelecionada = null
+        moduloSelecionado = null
+        tipoModuloAtual = TipoModulo.DESCONHECIDO
+        participantes.clear()
+        participantes.addAll(atividade.participantes)
+        nfcsRegistrados.clear()
+        nfcsRegistrados.addAll(atividade.participantes.map { it.nfc })
+        mostrarEstadoNFC(limparParticipantes = false, atividade = atividade)
+    }
+
+    private fun mostrarEstadoNFC(
+        limparParticipantes: Boolean,
+        atividade: AtividadeEmProgresso? = null
+    ) {
+        layoutSessoes.visibility = View.GONE
         layoutCriacaoAula.visibility = View.GONE
         layoutLeituraNFC.visibility = View.VISIBLE
         atualizarVisibilidadeLogout(false)
-        participantes.clear()
-        nfcsRegistrados.clear()
+        if (limparParticipantes) {
+            participantes.clear()
+            nfcsRegistrados.clear()
+        }
         filaNfcsPendentes.clear()
         nfcPendente = null
         atualizarListaNFCs()
 
         val unidade = empresaSelecionada?.unidades?.find { it.publicId == unidadeUuidSelecionada }
-        textViewDescricaoAtual.text = moduloSelecionado?.nome ?: sessionManager.getModuloEmProgresso() ?: ""
-        textViewUnidadeAtual.text = "Unidade: ${unidade?.unidadeNome ?: ""}"
+        textViewDescricaoAtual.text = atividade?.moduloNome
+            ?: moduloSelecionado?.nome
+            ?: sessionManager.getModuloEmProgresso()
+            ?: ""
+        textViewUnidadeAtual.text = "Unidade: ${unidade?.unidadeNome ?: atividade?.unidadeNome ?: ""}"
 
         ativarNFC()
         iniciarTimer()
     }
 
     private fun mostrarEstadoCriacao() {
+        layoutSessoes.visibility = View.GONE
         layoutLeituraNFC.visibility = View.GONE
         layoutCriacaoAula.visibility = View.VISIBLE
         atualizarVisibilidadeLogout(true)
@@ -654,6 +807,28 @@ class MainActivity : AppCompatActivity() {
         spinnerEmpresa.setText("", false)
         resetarSelecaoUnidade()
         resetarSelecaoModulo()
+    }
+
+    private fun obterNomeUnidadeAtual(): String? {
+        return empresaSelecionada?.unidades
+            ?.firstOrNull { it.publicId == unidadeUuidSelecionada }
+            ?.unidadeNome
+    }
+
+    private fun salvarAtividadeAtual() {
+        val uuid = sessaoUuid ?: return
+        val inicioMs = aulaInicioMs.takeIf { it > 0 } ?: return
+        val existente = sessionManager.getAtividadeEmProgresso(uuid)
+        sessionManager.salvarAtividadeEmProgresso(
+            AtividadeEmProgresso(
+                uuid = uuid,
+                inicioMs = inicioMs,
+                unidadeUuid = unidadeUuidSelecionada ?: existente?.unidadeUuid,
+                unidadeNome = obterNomeUnidadeAtual() ?: existente?.unidadeNome,
+                moduloNome = moduloSelecionado?.nome ?: existente?.moduloNome ?: sessionManager.getModuloEmProgresso(),
+                participantes = participantes.toList()
+            )
+        )
     }
 
     private fun atualizarVisibilidadeLogout(exibir: Boolean) {
@@ -675,6 +850,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        salvarAtividadeAtual()
         desativarNFC()
     }
 
@@ -784,34 +960,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ==========================================
-    // CRASH RECOVERY
-    // ==========================================
-
-    private fun verificarAulaEmProgresso() {
-        val aulaUuid = sessionManager.getAulaEmProgresso() ?: return
-        val inicioMs = sessionManager.getInicioAulaEmProgresso() ?: return
-        sessaoUuid = aulaUuid
-        aulaInicioMs = inicioMs
-        unidadeUuidSelecionada = sessionManager.getUnidadeEmProgresso()
-        textViewDescricaoAtual.text = sessionManager.getModuloEmProgresso() ?: ""
-        textViewUnidadeAtual.text = ""
-        mostrarEstadoNFC()
-    }
-
-    // ==========================================
     // HELPERS
     // ==========================================
 
-    private fun limparAulaEmProgresso() {
+    private fun limparAulaEmProgresso(uuid: String?) {
+        if (uuid != null) {
+            sessionManager.removerAtividadeEmProgresso(uuid)
+        }
         sessionManager.limparAulaEmProgresso()
         sessionManager.limparUnidadeEmProgresso()
         sessionManager.limparModuloEmProgresso()
+        sessaoUuid = null
+        aulaInicioMs = 0L
+        participantes.clear()
+        nfcsRegistrados.clear()
+        filaNfcsPendentes.clear()
+        nfcPendente = null
     }
 
     private fun obterTimestampUtc(): String {
         val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
         format.timeZone = TimeZone.getTimeZone("UTC")
         return format.format(Date())
+    }
+
+    private fun formatarDataLocal(timestampMs: Long): String {
+        val format = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+        return format.format(Date(timestampMs))
     }
 
     private fun irParaLogin() {

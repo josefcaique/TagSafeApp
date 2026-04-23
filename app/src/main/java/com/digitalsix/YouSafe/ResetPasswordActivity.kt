@@ -33,6 +33,7 @@ class ResetPasswordActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_reset_password)
 
+        RetrofitInstance.initialize(applicationContext)
         sessionManager = SessionManager(this)
 
         // Verificar se está logado

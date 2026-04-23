@@ -25,6 +25,8 @@ class ForgotPasswordActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_forgot_password)
 
+        RetrofitInstance.initialize(applicationContext)
+
         editTextEmail = findViewById(R.id.editTextEmailForgot)
         buttonSend = findViewById(R.id.buttonSendReset)
         progressBar = findViewById(R.id.progressBarForgot)

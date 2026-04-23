@@ -38,6 +38,7 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
+        RetrofitInstance.initialize(applicationContext)
         sessionManager = SessionManager(this)
 
         window.setSoftInputMode(

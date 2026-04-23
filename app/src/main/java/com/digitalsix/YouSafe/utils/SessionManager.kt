@@ -2,8 +2,19 @@ package com.digitalsix.YouSafe.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.Usuario
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+
+data class AtividadeEmProgresso(
+    val uuid: String,
+    val inicioMs: Long,
+    val unidadeUuid: String?,
+    val unidadeNome: String?,
+    val moduloNome: String?,
+    val participantes: List<ParticipanteSessao> = emptyList()
+)
 
 /**
  * Gerenciador de sessão do usuário
@@ -25,6 +36,7 @@ class SessionManager(context: Context) {
         private const val KEY_UNIDADE_EM_PROGRESSO = "unidade_em_progresso_uuid"
         private const val KEY_MODULO_EM_PROGRESSO = "modulo_em_progresso"
         private const val KEY_AULA_INICIO_MS = "aula_inicio_ms"
+        private const val KEY_ATIVIDADES_EM_PROGRESSO = "atividades_em_progresso"
     }
 
     /**
@@ -65,6 +77,23 @@ class SessionManager(context: Context) {
 
     fun getRefreshExpiresAt(): String? {
         return prefs.getString(KEY_REFRESH_EXPIRES_AT, null)
+    }
+
+    fun atualizarTokens(
+        token: String,
+        refreshToken: String? = null,
+        refreshExpiresAt: String? = null
+    ) {
+        val editor = prefs.edit()
+        editor.putString(KEY_TOKEN, token)
+        if (!refreshToken.isNullOrBlank()) {
+            editor.putString(KEY_REFRESH_TOKEN, refreshToken)
+        }
+        if (!refreshExpiresAt.isNullOrBlank()) {
+            editor.putString(KEY_REFRESH_EXPIRES_AT, refreshExpiresAt)
+        }
+        editor.putBoolean(KEY_LOGGED_IN, true)
+        editor.apply()
     }
 
     /**
@@ -147,6 +176,70 @@ class SessionManager(context: Context) {
         editor.apply()
     }
 
+    fun salvarAtividadeEmProgresso(atividade: AtividadeEmProgresso) {
+        val atividades = getAtividadesEmProgresso()
+            .filterNot { it.uuid == atividade.uuid }
+            .plus(atividade)
+            .sortedByDescending { it.inicioMs }
+        prefs.edit()
+            .putString(KEY_ATIVIDADES_EM_PROGRESSO, gson.toJson(atividades))
+            .apply()
+    }
+
+    fun getAtividadesEmProgresso(): List<AtividadeEmProgresso> {
+        val atividadesJson = prefs.getString(KEY_ATIVIDADES_EM_PROGRESSO, null)
+        val atividades = if (atividadesJson.isNullOrBlank()) {
+            emptyList()
+        } else {
+            try {
+                val type = object : TypeToken<List<AtividadeEmProgresso>>() {}.type
+                gson.fromJson<List<AtividadeEmProgresso>>(atividadesJson, type).orEmpty()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+
+        if (atividades.isNotEmpty()) {
+            return atividades
+                .filter { it.uuid.isNotBlank() }
+                .map { it.copy(participantes = it.participantes.orEmpty()) }
+        }
+
+        val aulaUuid = getAulaEmProgresso() ?: return emptyList()
+        val inicioMs = getInicioAulaEmProgresso() ?: return emptyList()
+        return listOf(
+            AtividadeEmProgresso(
+                uuid = aulaUuid,
+                inicioMs = inicioMs,
+                unidadeUuid = getUnidadeEmProgresso(),
+                unidadeNome = null,
+                moduloNome = getModuloEmProgresso()
+            )
+        )
+    }
+
+    fun getAtividadeEmProgresso(uuid: String): AtividadeEmProgresso? {
+        return getAtividadesEmProgresso().firstOrNull { it.uuid == uuid }
+    }
+
+    fun atualizarParticipantesAtividade(uuid: String, participantes: List<ParticipanteSessao>) {
+        val atividade = getAtividadeEmProgresso(uuid) ?: return
+        salvarAtividadeEmProgresso(atividade.copy(participantes = participantes))
+    }
+
+    fun removerAtividadeEmProgresso(uuid: String) {
+        val atividades = getAtividadesEmProgresso().filterNot { it.uuid == uuid }
+        prefs.edit()
+            .putString(KEY_ATIVIDADES_EM_PROGRESSO, gson.toJson(atividades))
+            .apply()
+
+        if (getAulaEmProgresso() == uuid) {
+            limparAulaEmProgresso()
+            limparUnidadeEmProgresso()
+            limparModuloEmProgresso()
+        }
+    }
+
     fun salvarInicioAulaEmProgresso(inicioMs: Long) {
         val editor = prefs.edit()
         editor.putLong(KEY_AULA_INICIO_MS, inicioMs)
@@ -218,6 +311,6 @@ class SessionManager(context: Context) {
      * Verificar se existe aula em progresso
      */
     fun temAulaEmProgresso(): Boolean {
-        return getAulaEmProgresso() != null
+        return getAtividadesEmProgresso().isNotEmpty()
     }
 }

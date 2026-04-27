@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.digitalsix.YouSafe.network.ResetPasswordRequest
+import com.digitalsix.YouSafe.network.UpdatePasswordRequest
 import com.digitalsix.YouSafe.network.RetrofitInstance
 import com.digitalsix.YouSafe.utils.SessionManager
 import com.google.android.material.textfield.TextInputEditText
@@ -19,7 +20,7 @@ import kotlinx.coroutines.launch
  * 1. Usuário faz login
  * 2. Se primeiro_acesso == true, é redirecionado para esta tela
  * 3. Define nova senha
- * 4. Senha é atualizada via POST /auth/resetSenha/:uuid
+ * 4. Senha é atualizada via POST /auth/update-password
  * 5. Redireciona para MainActivity
  */
 class ResetPasswordActivity : AppCompatActivity() {
@@ -106,47 +107,43 @@ class ResetPasswordActivity : AppCompatActivity() {
     }
 
     private fun resetarSenha(senha: String) {
-        val usuario = sessionManager.getUsuario() ?: return
+        val confirmarSenha = inputConfirmarSenha.text.toString().trim()
         val token = sessionManager.getTokenWithBearer() ?: return
-        val usuarioUuid = usuario.publicId ?: run {
-            Toast.makeText(this, "Usuário sem UUID para redefinir senha.", Toast.LENGTH_LONG).show()
-            return
-        }
 
         buttonConfirmar.isEnabled = false
         buttonConfirmar.text = "Aguarde..."
 
         lifecycleScope.launch {
             try {
-                val request = ResetPasswordRequest(
-                    senha = senha
+                val request = UpdatePasswordRequest(
+                    senha = senha,
+                    confirmSenha = confirmarSenha
                 )
 
-                val response = RetrofitInstance.api.resetPassword(
+                val response = RetrofitInstance.api.updatePassword(
                     token = token,
-                    userUuid = usuarioUuid,
                     request = request
                 )
 
                 if (response.isSuccessful) {
-                    sessionManager.clearSession()
+                    // Atualizar flag de primeiro acesso no SessionManager localmente
+                    sessionManager.atualizarPrimeiroAcesso(false)
+
                     Toast.makeText(
                         this@ResetPasswordActivity,
-                        "✅ Senha atualizada! Faça login novamente.",
+                        "✅ Senha atualizada com sucesso!",
                         Toast.LENGTH_SHORT
                     ).show()
 
-                    // Atualizar flag de primeiro acesso no SessionManager
-                    sessionManager.atualizarPrimeiroAcesso(false)
-
                     // Ir para MainActivity
-                    irParaLogin()
+                    irParaMain()
 
                 } else {
                     val errorBody = response.errorBody()?.string()
+                    val mensagem = extrairMensagemErro(errorBody) ?: "Falha ao atualizar senha"
                     Toast.makeText(
                         this@ResetPasswordActivity,
-                        "Erro: ${errorBody ?: "Falha ao atualizar senha"}",
+                        "Erro: $mensagem",
                         Toast.LENGTH_LONG
                     ).show()
                     buttonConfirmar.isEnabled = true
@@ -161,6 +158,21 @@ class ResetPasswordActivity : AppCompatActivity() {
                 buttonConfirmar.isEnabled = true
                 buttonConfirmar.text = "Confirmar"
             }
+        }
+    }
+
+    private fun extrairMensagemErro(errorBody: String?): String? {
+        if (errorBody.isNullOrBlank()) return null
+        return try {
+            val json = org.json.JSONObject(errorBody)
+            when {
+                json.has("message") -> json.optString("message")
+                json.has("mensagem") -> json.optString("mensagem")
+                json.has("error") -> json.optString("error")
+                else -> null
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 

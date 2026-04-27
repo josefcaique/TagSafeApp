@@ -31,6 +31,23 @@ data class ResetPasswordResponse(
 )
 
 // ==========================================
+// MODELOS PARA ATUALIZAÇÃO DE SENHA (PRIMEIRO ACESSO)
+// ==========================================
+
+data class UpdatePasswordRequest(
+    @SerializedName("senha")
+    val senha: String,
+
+    @SerializedName("confirmSenha")
+    val confirmSenha: String
+)
+
+data class UpdatePasswordResponse(
+    @SerializedName("message")
+    val message: String
+)
+
+// ==========================================
 // MODELOS PARA GINASTICA, TREINAMENTOS E SESSOES
 // ==========================================
 

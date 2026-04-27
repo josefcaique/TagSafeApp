@@ -41,6 +41,12 @@ interface ApiService {
         @Body request: ResetPasswordRequest
     ): Response<ResetPasswordResponse>
 
+    @POST("auth/update-password")
+    suspend fun updatePassword(
+        @Header("Authorization") token: String,
+        @Body request: UpdatePasswordRequest
+    ): Response<UpdatePasswordResponse>
+
     // ==========================================
     // ROTAS DE GINASTICA, TREINAMENTOS E SESSOES
     // ==========================================

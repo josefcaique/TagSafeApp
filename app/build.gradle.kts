@@ -11,8 +11,8 @@ android {
         applicationId = "com.digitalsix.YouSafe"
         minSdk = 23
         targetSdk = 35
-        versionCode = 12
-        versionName = "6.1"
+        versionCode = 14
+        versionName = "6.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

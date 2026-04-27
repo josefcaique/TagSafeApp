@@ -6,7 +6,6 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.digitalsix.YouSafe.network.ResetPasswordRequest
 import com.digitalsix.YouSafe.network.UpdatePasswordRequest
 import com.digitalsix.YouSafe.network.RetrofitInstance
 import com.digitalsix.YouSafe.utils.SessionManager
@@ -15,13 +14,6 @@ import kotlinx.coroutines.launch
 
 /**
  * Activity para redefinição de senha no primeiro acesso
- *
- * Fluxo:
- * 1. Usuário faz login
- * 2. Se primeiro_acesso == true, é redirecionado para esta tela
- * 3. Define nova senha
- * 4. Senha é atualizada via POST /auth/update-password
- * 5. Redireciona para MainActivity
  */
 class ResetPasswordActivity : AppCompatActivity() {
 
@@ -37,16 +29,13 @@ class ResetPasswordActivity : AppCompatActivity() {
         RetrofitInstance.initialize(applicationContext)
         sessionManager = SessionManager(this)
 
-        // Verificar se está logado
         if (!sessionManager.isLoggedIn()) {
             irParaLogin()
             return
         }
 
-        // Verificar se realmente é primeiro acesso
         val usuario = sessionManager.getUsuario()
         if (usuario?.primeiroAcesso != true) {
-            // Não é primeiro acesso, ir direto para Main
             irParaMain()
             return
         }
@@ -126,17 +115,17 @@ class ResetPasswordActivity : AppCompatActivity() {
                 )
 
                 if (response.isSuccessful) {
-                    // Atualizar flag de primeiro acesso no SessionManager localmente
-                    sessionManager.atualizarPrimeiroAcesso(false)
+                    // ✅ Senha atualizada! Agora limpamos a sessão antiga por segurança
+                    sessionManager.clearSession()
 
                     Toast.makeText(
                         this@ResetPasswordActivity,
-                        "✅ Senha atualizada com sucesso!",
-                        Toast.LENGTH_SHORT
+                        "✅ Senha atualizada! Por favor, faça login novamente.",
+                        Toast.LENGTH_LONG
                     ).show()
 
-                    // Ir para MainActivity
-                    irParaMain()
+                    // ✅ Redireciona para a tela de LOGIN em vez da Main
+                    irParaLogin()
 
                 } else {
                     val errorBody = response.errorBody()?.string()

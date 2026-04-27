@@ -147,7 +147,7 @@ data class CriarAulaRequest(
     val unidadeId: String,
 
     @SerializedName("data")
-    val data: String? = null  // ISO 8601 format, opcional
+    val data: String? = null
 )
 
 data class CriarAulaResponse(
@@ -234,7 +234,7 @@ data class AbortarAulaResponse(
 )
 
 // ==========================================
-// MODELO PARA LOGIN (já existe, mas garantindo)
+// MODELO PARA LOGIN
 // ==========================================
 
 data class LoginRequest(
@@ -328,13 +328,8 @@ data class Usuario(
     val unidadesPublicIds: List<String>? = null
 ) {
     val instrutorUuid: String?
-        get() = instrutorPublicId ?: publicId
+        get() = instrutorPublicId ?: instrutorId?.toString() ?: publicId
 }
-
-data class Instrutor(
-    @SerializedName("id")
-    val id: Int,
-)
 
 data class Role(
     @SerializedName(value = "role_id", alternate = ["id"])
@@ -408,7 +403,6 @@ data class TipoAula(
     val descricao: String
 )
 
-// Response da busca (pode vir com dados ou tudo null)
 data class GetFuncionarioByNFCResponse(
     @SerializedName("funcionario_id")
     val funcionario_id: Int?,

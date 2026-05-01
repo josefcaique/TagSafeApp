@@ -69,6 +69,13 @@ interface ApiService {
         @Body request: SessaoRequest
     ): Response<JsonElement>
 
+    @POST("sessoes/{uuid}/iniciar-treinamento")
+    suspend fun iniciarTreinamentoSessao(
+        @Header("Authorization") token: String,
+        @Path("uuid") sessaoUuid: String,
+        @Body request: IniciarTreinamentoSessaoRequest
+    ): Response<Any>
+
     @POST("sessoes/{uuid}/confirmar")
     suspend fun confirmarSessao(
         @Header("Authorization") token: String,

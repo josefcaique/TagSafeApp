@@ -7,6 +7,7 @@ import com.digitalsix.YouSafe.network.EmpresaUnidadeResponse
 import com.digitalsix.YouSafe.network.GetFuncionarioByNFCResponse
 import com.digitalsix.YouSafe.network.GinasticaLaboralRequest
 import com.digitalsix.YouSafe.network.IdResponse
+import com.digitalsix.YouSafe.network.IniciarTreinamentoSessaoRequest
 import com.digitalsix.YouSafe.network.InstrutorUnidadesResponse
 import com.digitalsix.YouSafe.network.SessaoRequest
 import com.digitalsix.YouSafe.network.TreinamentoRequest
@@ -72,6 +73,12 @@ class MainRepository(private val api: ApiService) {
             ApiResult.Error(e.message ?: "Erro de conexao")
         }
     }
+
+    suspend fun iniciarTreinamentoSessao(
+        token: String,
+        sessaoUuid: String,
+        request: IniciarTreinamentoSessaoRequest
+    ): ApiResult<Unit> = safeCallUnit { api.iniciarTreinamentoSessao(token, sessaoUuid, request) }
 
     suspend fun confirmarSessao(
         token: String,

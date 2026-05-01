@@ -109,7 +109,16 @@ data class SessaoRequest(
     val statusId: String?,
 
     @SerializedName("data_inicio")
-    val dataInicio: String,
+    val dataInicio: String?,
+
+    @SerializedName("data_abertura_apontamento")
+    val dataAberturaApontamento: String?,
+
+    @SerializedName("quantidade_apontamentos")
+    val quantidadeApontamentos: Int = 1,
+
+    @SerializedName("apontamento_atual")
+    val apontamentoAtual: Int = 1,
 
     @SerializedName("treinamento_id")
     val treinamentoId: String?,
@@ -188,6 +197,14 @@ data class AulaInfo(
 data class ConfirmarSessaoRequest(
     @SerializedName("data_fim")
     val dataFim: String,
+
+    @SerializedName("participantes")
+    val participantes: List<ParticipanteSessao>
+)
+
+data class IniciarTreinamentoSessaoRequest(
+    @SerializedName("data_inicio")
+    val dataInicio: String,
 
     @SerializedName("participantes")
     val participantes: List<ParticipanteSessao>

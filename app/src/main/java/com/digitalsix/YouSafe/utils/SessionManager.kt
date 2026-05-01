@@ -13,7 +13,9 @@ data class AtividadeEmProgresso(
     val unidadeUuid: String?,
     val unidadeNome: String?,
     val moduloNome: String?,
-    val participantes: List<ParticipanteSessao> = emptyList()
+    val participantes: List<ParticipanteSessao> = emptyList(),
+    val quantidadeApontamentos: Int = 1,
+    val apontamentoAtual: Int = 1
 )
 
 /**
@@ -202,7 +204,19 @@ class SessionManager(context: Context) {
         if (atividades.isNotEmpty()) {
             return atividades
                 .filter { it.uuid.isNotBlank() }
-                .map { it.copy(participantes = it.participantes.orEmpty()) }
+                .map { atividade ->
+                    val quantidadeApontamentos = atividade.quantidadeApontamentos
+                        .takeIf { it in 1..2 }
+                        ?: 1
+                    val apontamentoAtual = atividade.apontamentoAtual
+                        .takeIf { it in 1..quantidadeApontamentos }
+                        ?: 1
+                    atividade.copy(
+                        participantes = atividade.participantes.orEmpty(),
+                        quantidadeApontamentos = quantidadeApontamentos,
+                        apontamentoAtual = apontamentoAtual
+                    )
+                }
         }
 
         val aulaUuid = getAulaEmProgresso() ?: return emptyList()

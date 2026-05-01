@@ -17,6 +17,7 @@ import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.LinearLayout
+import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -76,6 +77,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutSpinnerModule: TextInputLayout
     private lateinit var layoutTreinamentoFields: LinearLayout
     private lateinit var editTextNomeTreinamento: AutoCompleteTextView
+    private lateinit var radioGroupTipoBatida: RadioGroup
     private lateinit var textViewDescricaoLabel: TextView
     private lateinit var layoutDescricaoAula: TextInputLayout
     private lateinit var editTextDescricaoAula: TextInputEditText
@@ -101,6 +103,8 @@ class MainActivity : AppCompatActivity() {
     private val participantes = mutableListOf<ParticipanteSessao>()
     private val nfcsRegistrados = mutableListOf<String>()
     private var aulaInicioMs: Long = 0L
+    private var quantidadeApontamentosAtual: Int = 1
+    private var apontamentoAtual: Int = 1
     private var empresasPopuladas = false
     private var nfcPendente: String? = null
     private val filaNfcsPendentes = ArrayDeque<String>()
@@ -173,6 +177,7 @@ class MainActivity : AppCompatActivity() {
         layoutSpinnerModule = findViewById(R.id.layoutSpinnerModule)
         layoutTreinamentoFields = findViewById(R.id.layoutTreinamentoFields)
         editTextNomeTreinamento = findViewById(R.id.editTextNomeTreinamento)
+        radioGroupTipoBatida = findViewById(R.id.radioGroupTipoBatida)
         textViewDescricaoLabel = findViewById(R.id.textViewDescricaoLabel)
         layoutDescricaoAula = findViewById(R.id.layoutDescricaoAula)
         editTextDescricaoAula = findViewById(R.id.editTextDescricaoAula)
@@ -367,6 +372,9 @@ class MainActivity : AppCompatActivity() {
         spinnerModule.setAdapter(null)
         editTextNomeTreinamento.setText("", false)
         editTextDescricaoAula.setText("")
+        if (::radioGroupTipoBatida.isInitialized) {
+            radioGroupTipoBatida.check(R.id.radioBatidaUnica)
+        }
         layoutSpinnerModule.isEnabled = false
         spinnerModule.isEnabled = false
         layoutTreinamentoFields.visibility = View.GONE
@@ -389,6 +397,8 @@ class MainActivity : AppCompatActivity() {
     private fun atualizarCamposPorTipoModulo() {
         when (tipoModuloAtual) {
             TipoModulo.GINASTICA_LABORAL -> {
+                quantidadeApontamentosAtual = 1
+                apontamentoAtual = 1
                 layoutTreinamentoFields.visibility = View.GONE
                 textViewDescricaoLabel.visibility = View.VISIBLE
                 layoutDescricaoAula.visibility = View.VISIBLE
@@ -402,6 +412,8 @@ class MainActivity : AppCompatActivity() {
                 viewModel.carregarTreinamentosSeNecessario(token, unidadeUuid)
             }
             TipoModulo.DESCONHECIDO -> {
+                quantidadeApontamentosAtual = 1
+                apontamentoAtual = 1
                 layoutTreinamentoFields.visibility = View.GONE
                 textViewDescricaoLabel.visibility = View.GONE
                 layoutDescricaoAula.visibility = View.GONE
@@ -460,7 +472,9 @@ class MainActivity : AppCompatActivity() {
                             inicioMs = aulaInicioMs,
                             unidadeUuid = unidadeUuidSelecionada,
                             unidadeNome = obterNomeUnidadeAtual(),
-                            moduloNome = moduloSelecionado?.nome
+                            moduloNome = moduloSelecionado?.nome,
+                            quantidadeApontamentos = quantidadeApontamentosAtual,
+                            apontamentoAtual = apontamentoAtual
                         )
                     )
                     mostrarEstadoNFC(limparParticipantes = true)
@@ -475,6 +489,51 @@ class MainActivity : AppCompatActivity() {
                 is AcaoState.Idle -> {
                     buttonIniciarAula.isEnabled = true
                     buttonIniciarAula.text = "Iniciar atividade"
+                }
+            }
+        }
+
+        viewModel.iniciarTreinamentoSessaoState.observe(this) { state ->
+            when (state) {
+                is AcaoState.Loading -> {
+                    buttonConfirmarAula.isEnabled = false
+                    buttonConfirmarAula.text = "Iniciando treinamento..."
+                }
+                is AcaoState.Sucesso -> {
+                    aulaInicioMs = System.currentTimeMillis()
+                    apontamentoAtual = 2
+                    participantes.clear()
+                    nfcsRegistrados.clear()
+                    filaNfcsPendentes.clear()
+                    nfcPendente = null
+                    sessaoUuid?.let { uuid ->
+                        sessionManager.salvarInicioAulaEmProgresso(aulaInicioMs)
+                        sessionManager.salvarAtividadeEmProgresso(
+                            AtividadeEmProgresso(
+                                uuid = uuid,
+                                inicioMs = aulaInicioMs,
+                                unidadeUuid = unidadeUuidSelecionada,
+                                unidadeNome = obterNomeUnidadeAtual(),
+                                moduloNome = moduloSelecionado?.nome ?: sessionManager.getModuloEmProgresso(),
+                                participantes = emptyList(),
+                                quantidadeApontamentos = quantidadeApontamentosAtual,
+                                apontamentoAtual = apontamentoAtual
+                            )
+                        )
+                    }
+                    Toast.makeText(this, "Treinamento iniciado. Faça a segunda batida.", Toast.LENGTH_SHORT).show()
+                    mostrarEstadoNFC(limparParticipantes = true)
+                    viewModel.consumirIniciarTreinamentoSessaoEstado()
+                }
+                is AcaoState.Erro -> {
+                    buttonConfirmarAula.isEnabled = true
+                    atualizarTextoBotaoConfirmar()
+                    Toast.makeText(this, state.mensagem, Toast.LENGTH_LONG).show()
+                    viewModel.consumirIniciarTreinamentoSessaoEstado()
+                }
+                is AcaoState.Idle -> {
+                    buttonConfirmarAula.isEnabled = true
+                    atualizarTextoBotaoConfirmar()
                 }
             }
         }
@@ -554,7 +613,9 @@ class MainActivity : AppCompatActivity() {
         buttonVoltarSessoesCriacao.setOnClickListener { mostrarTelaSessoes() }
         buttonVoltarSessoesNFC.setOnClickListener { mostrarTelaSessoes() }
         buttonIniciarAula.setOnClickListener { iniciarAula() }
-        buttonConfirmarAula.setOnClickListener { confirmarAula() }
+        buttonConfirmarAula.setOnClickListener {
+            if (deveIniciarTreinamentoComBatidaAtual()) iniciarTreinamentoComBatidas() else confirmarAula()
+        }
         buttonAbortarAula.setOnClickListener { abortarAula() }
     }
 
@@ -611,6 +672,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        quantidadeApontamentosAtual = if (tipoModuloAtual == TipoModulo.TREINAMENTO) obterQuantidadeApontamentosSelecionada() else 1
+        apontamentoAtual = 1
+
         viewModel.criarSessao(
             token = token,
             tipoModulo = tipoModuloAtual,
@@ -622,8 +686,33 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Módulo sem UUID.", Toast.LENGTH_SHORT).show()
                 return
             },
-            treinamentoSelecionadoId = treinamentoUuid
+            treinamentoSelecionadoId = treinamentoUuid,
+            quantidadeApontamentos = quantidadeApontamentosAtual
         )
+    }
+
+    private fun obterQuantidadeApontamentosSelecionada(): Int {
+        return if (::radioGroupTipoBatida.isInitialized && radioGroupTipoBatida.checkedRadioButtonId == R.id.radioBatidaDupla) 2 else 1
+    }
+
+    private fun deveIniciarTreinamentoComBatidaAtual(): Boolean {
+        return quantidadeApontamentosAtual == 2 && apontamentoAtual == 1
+    }
+
+    private fun atualizarTextoBotaoConfirmar() {
+        if (!::buttonConfirmarAula.isInitialized) return
+        buttonConfirmarAula.isEnabled = true
+        buttonConfirmarAula.text = if (deveIniciarTreinamentoComBatidaAtual()) {
+            "Iniciar treinamento"
+        } else {
+            "Confirmar atividade"
+        }
+    }
+
+    private fun iniciarTreinamentoComBatidas() {
+        val token = sessionManager.getTokenWithBearer() ?: return
+        val uuid = sessaoUuid ?: return
+        viewModel.iniciarTreinamentoSessao(token, uuid, obterTimestampUtc(), participantes.toList())
     }
 
     private fun confirmarAula() {
@@ -749,6 +838,8 @@ class MainActivity : AppCompatActivity() {
     private fun abrirAtividade(atividade: AtividadeEmProgresso) {
         sessaoUuid = atividade.uuid
         aulaInicioMs = atividade.inicioMs
+        quantidadeApontamentosAtual = atividade.quantidadeApontamentos
+        apontamentoAtual = atividade.apontamentoAtual
         unidadeUuidSelecionada = atividade.unidadeUuid
         empresaSelecionada = null
         moduloSelecionado = null
@@ -775,6 +866,7 @@ class MainActivity : AppCompatActivity() {
         filaNfcsPendentes.clear()
         nfcPendente = null
         atualizarListaNFCs()
+        atualizarTextoBotaoConfirmar()
 
         val unidade = empresaSelecionada?.unidades?.find { it.publicId == unidadeUuidSelecionada }
         textViewDescricaoAtual.text = atividade?.moduloNome
@@ -800,6 +892,11 @@ class MainActivity : AppCompatActivity() {
         nfcsRegistrados.clear()
         filaNfcsPendentes.clear()
         nfcPendente = null
+        quantidadeApontamentosAtual = 1
+        apontamentoAtual = 1
+        if (::radioGroupTipoBatida.isInitialized) {
+            radioGroupTipoBatida.check(R.id.radioBatidaUnica)
+        }
     }
 
     private fun limparSelecaoNovaAtividade() {
@@ -826,7 +923,9 @@ class MainActivity : AppCompatActivity() {
                 unidadeUuid = unidadeUuidSelecionada ?: existente?.unidadeUuid,
                 unidadeNome = obterNomeUnidadeAtual() ?: existente?.unidadeNome,
                 moduloNome = moduloSelecionado?.nome ?: existente?.moduloNome ?: sessionManager.getModuloEmProgresso(),
-                participantes = participantes.toList()
+                participantes = participantes.toList(),
+                quantidadeApontamentos = quantidadeApontamentosAtual,
+                apontamentoAtual = apontamentoAtual
             )
         )
     }
@@ -972,6 +1071,8 @@ class MainActivity : AppCompatActivity() {
         sessionManager.limparModuloEmProgresso()
         sessaoUuid = null
         aulaInicioMs = 0L
+        quantidadeApontamentosAtual = 1
+        apontamentoAtual = 1
         participantes.clear()
         nfcsRegistrados.clear()
         filaNfcsPendentes.clear()

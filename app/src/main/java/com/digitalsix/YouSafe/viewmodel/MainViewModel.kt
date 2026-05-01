@@ -13,6 +13,7 @@ import com.digitalsix.YouSafe.network.AbortarAulaRequest
 import com.digitalsix.YouSafe.network.ConfirmarSessaoRequest
 import com.digitalsix.YouSafe.network.GetFuncionarioByNFCResponse
 import com.digitalsix.YouSafe.network.GinasticaLaboralRequest
+import com.digitalsix.YouSafe.network.IniciarTreinamentoSessaoRequest
 import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.UnidadeAtendidaDetalhe
 import com.digitalsix.YouSafe.network.SessaoRequest
@@ -58,6 +59,9 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
 
     private val _criarSessaoState = MutableLiveData<AcaoState>(AcaoState.Idle)
     val criarSessaoState: LiveData<AcaoState> = _criarSessaoState
+
+    private val _iniciarTreinamentoSessaoState = MutableLiveData<AcaoState>(AcaoState.Idle)
+    val iniciarTreinamentoSessaoState: LiveData<AcaoState> = _iniciarTreinamentoSessaoState
 
     private val _confirmarSessaoState = MutableLiveData<AcaoState>(AcaoState.Idle)
     val confirmarSessaoState: LiveData<AcaoState> = _confirmarSessaoState
@@ -194,7 +198,8 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         unidadeId: String,
         instrutorId: String,
         moduloId: String,
-        treinamentoSelecionadoId: String?
+        treinamentoSelecionadoId: String?,
+        quantidadeApontamentos: Int = 1
     ) {
         _criarSessaoState.value = AcaoState.Loading
         viewModelScope.launch {
@@ -268,11 +273,16 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
                 }
             }
 
+            val timestampAbertura = obterTimestampUtc()
+            val usarBatidaDupla = tipoModulo == TipoModulo.TREINAMENTO && quantidadeApontamentos == 2
             val request = SessaoRequest(
                 unidadeId = unidadeId,
                 instrutorId = instrutorId,
-                statusId = STATUS_EM_ANDAMENTO_UUID,
-                dataInicio = obterTimestampUtc(),
+                statusId = if (usarBatidaDupla) null else STATUS_EM_ANDAMENTO_UUID,
+                dataInicio = if (usarBatidaDupla) null else timestampAbertura,
+                dataAberturaApontamento = timestampAbertura,
+                quantidadeApontamentos = if (usarBatidaDupla) 2 else 1,
+                apontamentoAtual = 1,
                 treinamentoId = treinamentoId,
                 ginasticaLaboralId = ginasticaLaboralId,
                 moduloId = moduloId,
@@ -291,6 +301,25 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
                 is ApiResult.Error -> {
                     _criarSessaoState.value = AcaoState.Erro(result.message)
                 }
+            }
+        }
+    }
+
+    fun iniciarTreinamentoSessao(
+        token: String,
+        sessaoId: String,
+        dataInicio: String,
+        participantes: List<ParticipanteSessao>
+    ) {
+        _iniciarTreinamentoSessaoState.value = AcaoState.Loading
+        viewModelScope.launch {
+            val request = IniciarTreinamentoSessaoRequest(
+                dataInicio = dataInicio,
+                participantes = participantes
+            )
+            when (val result = repository.iniciarTreinamentoSessao(token, sessaoId, request)) {
+                is ApiResult.Success -> _iniciarTreinamentoSessaoState.value = AcaoState.Sucesso()
+                is ApiResult.Error -> _iniciarTreinamentoSessaoState.value = AcaoState.Erro(result.message)
             }
         }
     }
@@ -335,6 +364,10 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
 
     fun consumirCriarSessaoEstado() {
         _criarSessaoState.value = AcaoState.Idle
+    }
+
+    fun consumirIniciarTreinamentoSessaoEstado() {
+        _iniciarTreinamentoSessaoState.value = AcaoState.Idle
     }
 
     fun consumirConfirmarSessaoEstado() {

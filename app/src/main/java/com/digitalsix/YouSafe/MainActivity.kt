@@ -17,7 +17,7 @@ import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.LinearLayout
-import android.widget.RadioGroup
+import android.widget.RadioButton
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -77,7 +77,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutSpinnerModule: TextInputLayout
     private lateinit var layoutTreinamentoFields: LinearLayout
     private lateinit var editTextNomeTreinamento: AutoCompleteTextView
-    private lateinit var radioGroupTipoBatida: RadioGroup
+    private lateinit var cardBatidaUnica: MaterialCardView
+    private lateinit var cardBatidaDupla: MaterialCardView
+    private lateinit var radioBatidaUnica: RadioButton
+    private lateinit var radioBatidaDupla: RadioButton
     private lateinit var textViewDescricaoLabel: TextView
     private lateinit var layoutDescricaoAula: TextInputLayout
     private lateinit var editTextDescricaoAula: TextInputEditText
@@ -129,6 +132,7 @@ class MainActivity : AppCompatActivity() {
         configurarToolbar()
         configurarDropdowns()
         configurarBotoes()
+        configurarTipoBatida()
         observarViewModel()
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
@@ -177,7 +181,10 @@ class MainActivity : AppCompatActivity() {
         layoutSpinnerModule = findViewById(R.id.layoutSpinnerModule)
         layoutTreinamentoFields = findViewById(R.id.layoutTreinamentoFields)
         editTextNomeTreinamento = findViewById(R.id.editTextNomeTreinamento)
-        radioGroupTipoBatida = findViewById(R.id.radioGroupTipoBatida)
+        cardBatidaUnica = findViewById(R.id.cardBatidaUnica)
+        cardBatidaDupla = findViewById(R.id.cardBatidaDupla)
+        radioBatidaUnica = findViewById(R.id.radioBatidaUnica)
+        radioBatidaDupla = findViewById(R.id.radioBatidaDupla)
         textViewDescricaoLabel = findViewById(R.id.textViewDescricaoLabel)
         layoutDescricaoAula = findViewById(R.id.layoutDescricaoAula)
         editTextDescricaoAula = findViewById(R.id.editTextDescricaoAula)
@@ -372,9 +379,7 @@ class MainActivity : AppCompatActivity() {
         spinnerModule.setAdapter(null)
         editTextNomeTreinamento.setText("", false)
         editTextDescricaoAula.setText("")
-        if (::radioGroupTipoBatida.isInitialized) {
-            radioGroupTipoBatida.check(R.id.radioBatidaUnica)
-        }
+        selecionarTipoBatida(1)
         layoutSpinnerModule.isEnabled = false
         spinnerModule.isEnabled = false
         layoutTreinamentoFields.visibility = View.GONE
@@ -619,6 +624,36 @@ class MainActivity : AppCompatActivity() {
         buttonAbortarAula.setOnClickListener { abortarAula() }
     }
 
+    private fun configurarTipoBatida() {
+        cardBatidaUnica.setOnClickListener { selecionarTipoBatida(1) }
+        cardBatidaDupla.setOnClickListener { selecionarTipoBatida(2) }
+        selecionarTipoBatida(1)
+    }
+
+    private fun selecionarTipoBatida(quantidadeApontamentos: Int) {
+        if (!::radioBatidaUnica.isInitialized || !::radioBatidaDupla.isInitialized) return
+        val usarBatidaDupla = quantidadeApontamentos == 2
+        radioBatidaUnica.isChecked = !usarBatidaDupla
+        radioBatidaDupla.isChecked = usarBatidaDupla
+        atualizarVisualTipoBatida()
+    }
+
+    private fun atualizarVisualTipoBatida() {
+        if (!::cardBatidaUnica.isInitialized || !::cardBatidaDupla.isInitialized) return
+        val density = resources.displayMetrics.density
+        val selectedStroke = (2 * density).toInt()
+        val defaultStroke = (1 * density).toInt()
+        val isUnicaSelecionada = radioBatidaUnica.isChecked
+
+        cardBatidaUnica.setCardBackgroundColor(getColor(if (isUnicaSelecionada) R.color.turquoise_light else R.color.surface))
+        cardBatidaUnica.strokeColor = getColor(if (isUnicaSelecionada) R.color.turquoise else R.color.divider)
+        cardBatidaUnica.strokeWidth = if (isUnicaSelecionada) selectedStroke else defaultStroke
+
+        cardBatidaDupla.setCardBackgroundColor(getColor(if (!isUnicaSelecionada) R.color.turquoise_light else R.color.surface))
+        cardBatidaDupla.strokeColor = getColor(if (!isUnicaSelecionada) R.color.turquoise else R.color.divider)
+        cardBatidaDupla.strokeWidth = if (!isUnicaSelecionada) selectedStroke else defaultStroke
+    }
+
     private fun iniciarAula() {
         val token = sessionManager.getTokenWithBearer() ?: run {
             Toast.makeText(this, "Sessão expirada. Faça login novamente.", Toast.LENGTH_SHORT).show()
@@ -692,7 +727,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun obterQuantidadeApontamentosSelecionada(): Int {
-        return if (::radioGroupTipoBatida.isInitialized && radioGroupTipoBatida.checkedRadioButtonId == R.id.radioBatidaDupla) 2 else 1
+        return if (::radioBatidaDupla.isInitialized && radioBatidaDupla.isChecked) 2 else 1
     }
 
     private fun deveIniciarTreinamentoComBatidaAtual(): Boolean {
@@ -894,9 +929,7 @@ class MainActivity : AppCompatActivity() {
         nfcPendente = null
         quantidadeApontamentosAtual = 1
         apontamentoAtual = 1
-        if (::radioGroupTipoBatida.isInitialized) {
-            radioGroupTipoBatida.check(R.id.radioBatidaUnica)
-        }
+        selecionarTipoBatida(1)
     }
 
     private fun limparSelecaoNovaAtividade() {

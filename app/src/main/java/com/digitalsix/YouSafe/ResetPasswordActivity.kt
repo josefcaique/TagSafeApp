@@ -29,7 +29,8 @@ class ResetPasswordActivity : AppCompatActivity() {
         RetrofitInstance.initialize(applicationContext)
         sessionManager = SessionManager(this)
 
-        if (!sessionManager.isLoggedIn()) {
+        if (!sessionManager.isLoggedIn() || !sessionManager.isAccessTokenValid()) {
+            sessionManager.clearSession()
             irParaLogin()
             return
         }

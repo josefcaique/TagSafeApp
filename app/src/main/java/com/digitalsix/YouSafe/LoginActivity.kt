@@ -46,10 +46,14 @@ class LoginActivity : AppCompatActivity() {
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
         )
 
-        // Se já estiver logado, verificar primeiro acesso
         if (sessionManager.isLoggedIn()) {
-            verificarPrimeiroAcesso()
-            return
+            if (sessionManager.isAccessTokenValid()) {
+                verificarPrimeiroAcesso()
+                return
+            }
+
+            sessionManager.clearSession()
+            Toast.makeText(this, "Sessão expirada. Faça login novamente.", Toast.LENGTH_SHORT).show()
         }
 
         // Inicializar views

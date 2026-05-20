@@ -2,10 +2,12 @@ package com.digitalsix.YouSafe.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Base64
 import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.Usuario
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import org.json.JSONObject
 import java.util.UUID
 
 data class AtividadeEmProgresso(
@@ -116,6 +118,31 @@ class SessionManager(context: Context) {
     fun getTokenWithBearer(): String? {
         val token = getToken()
         return if (token != null) "Bearer $token" else null
+    }
+
+    fun isAccessTokenValid(clockSkewSeconds: Long = 60): Boolean {
+        val token = getToken()?.takeIf { it.isNotBlank() } ?: return false
+        val expiresAtSeconds = getJwtExpirationSeconds(token) ?: return false
+        val nowSeconds = System.currentTimeMillis() / 1000
+        return expiresAtSeconds > nowSeconds + clockSkewSeconds
+    }
+
+    private fun getJwtExpirationSeconds(token: String): Long? {
+        return try {
+            val parts = token.split(".")
+            if (parts.size < 2) return null
+
+            val payloadJson = String(
+                Base64.decode(
+                    parts[1],
+                    Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+                ),
+                Charsets.UTF_8
+            )
+            JSONObject(payloadJson).optLong("exp").takeIf { it > 0 }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /**

@@ -125,6 +125,12 @@ class MainActivity : AppCompatActivity() {
         configurarBarraStatus()
 
         sessionManager = SessionManager(this)
+        if (!sessionManager.isAccessTokenValid()) {
+            Toast.makeText(this, "Sessão expirada. Faça login novamente.", Toast.LENGTH_SHORT).show()
+            encerrarSessaoEIrParaLogin()
+            return
+        }
+
         val repository = MainRepository(RetrofitInstance.api)
         val factory = MainViewModelFactory(repository)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]

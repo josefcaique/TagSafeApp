@@ -10,6 +10,7 @@ import com.digitalsix.YouSafe.EmpresaComUnidades
 import com.digitalsix.YouSafe.TipoModulo
 import com.digitalsix.YouSafe.UnidadeInfo
 import com.digitalsix.YouSafe.network.AbortarAulaRequest
+import com.digitalsix.YouSafe.network.ColetaMobileRequest
 import com.digitalsix.YouSafe.network.ConfirmarSessaoRequest
 import com.digitalsix.YouSafe.network.GetFuncionarioByNFCResponse
 import com.digitalsix.YouSafe.network.GinasticaLaboralRequest
@@ -328,13 +329,15 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         token: String,
         sessaoId: String,
         dataFim: String,
-        participantes: List<ParticipanteSessao>
+        participantes: List<ParticipanteSessao>,
+        coletaMobile: ColetaMobileRequest
     ) {
         _confirmarSessaoState.value = AcaoState.Loading
         viewModelScope.launch {
             val request = ConfirmarSessaoRequest(
                 dataFim = dataFim,
-                participantes = participantes
+                participantes = participantes,
+                coletaMobile = coletaMobile
             )
             when (val result = repository.confirmarSessao(token, sessaoId, request)) {
                 is ApiResult.Success -> _confirmarSessaoState.value = AcaoState.Sucesso()

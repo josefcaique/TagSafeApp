@@ -199,7 +199,30 @@ data class ConfirmarSessaoRequest(
     val dataFim: String,
 
     @SerializedName("participantes")
-    val participantes: List<ParticipanteSessao>
+    val participantes: List<ParticipanteSessao>,
+
+    @SerializedName("coleta_mobile")
+    val coletaMobile: ColetaMobileRequest
+)
+
+data class ColetaMobileRequest(
+    @SerializedName("app_version")
+    val appVersion: String,
+
+    @SerializedName("platform")
+    val platform: String,
+
+    @SerializedName("platform_version")
+    val platformVersion: String,
+
+    @SerializedName("device_model")
+    val deviceModel: String,
+
+    @SerializedName("device_manufacturer")
+    val deviceManufacturer: String,
+
+    @SerializedName("device_id")
+    val deviceId: String
 )
 
 data class IniciarTreinamentoSessaoRequest(

@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.nfc.NfcAdapter
 import android.nfc.Tag
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -30,6 +31,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.ViewModelProvider
 import kotlin.math.max
+import com.digitalsix.YouSafe.network.ColetaMobileRequest
 import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.RetrofitInstance
 import com.digitalsix.YouSafe.network.modulos.moduloResponse
@@ -750,10 +752,31 @@ class MainActivity : AppCompatActivity() {
         viewModel.iniciarTreinamentoSessao(token, uuid, obterTimestampUtc(), participantes.toList())
     }
 
+    private fun buildColetaMobileRequest(): ColetaMobileRequest {
+        val appVersion = runCatching {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        }.getOrNull() ?: "unknown"
+
+        return ColetaMobileRequest(
+            appVersion = appVersion,
+            platform = "android",
+            platformVersion = Build.VERSION.RELEASE ?: Build.VERSION.SDK_INT.toString(),
+            deviceModel = Build.MODEL ?: "unknown",
+            deviceManufacturer = Build.MANUFACTURER ?: "unknown",
+            deviceId = sessionManager.getOrCreateDeviceId()
+        )
+    }
+
     private fun confirmarAula() {
         val token = sessionManager.getTokenWithBearer() ?: return
         val uuid = sessaoUuid ?: return
-        viewModel.confirmarSessao(token, uuid, obterTimestampUtc(), participantes.toList())
+        viewModel.confirmarSessao(
+            token,
+            uuid,
+            obterTimestampUtc(),
+            participantes.toList(),
+            buildColetaMobileRequest()
+        )
     }
 
     private fun abortarAula() {

@@ -6,6 +6,7 @@ import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.Usuario
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.util.UUID
 
 data class AtividadeEmProgresso(
     val uuid: String,
@@ -39,6 +40,7 @@ class SessionManager(context: Context) {
         private const val KEY_MODULO_EM_PROGRESSO = "modulo_em_progresso"
         private const val KEY_AULA_INICIO_MS = "aula_inicio_ms"
         private const val KEY_ATIVIDADES_EM_PROGRESSO = "atividades_em_progresso"
+        private const val KEY_DEVICE_ID = "device_id"
     }
 
     /**
@@ -79,6 +81,15 @@ class SessionManager(context: Context) {
 
     fun getRefreshExpiresAt(): String? {
         return prefs.getString(KEY_REFRESH_EXPIRES_AT, null)
+    }
+
+    fun getOrCreateDeviceId(): String {
+        val existing = prefs.getString(KEY_DEVICE_ID, null)
+        if (!existing.isNullOrBlank()) return existing
+
+        val deviceId = UUID.randomUUID().toString()
+        prefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
+        return deviceId
     }
 
     fun atualizarTokens(

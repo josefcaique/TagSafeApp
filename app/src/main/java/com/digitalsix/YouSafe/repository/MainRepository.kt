@@ -10,6 +10,7 @@ import com.digitalsix.YouSafe.network.IdResponse
 import com.digitalsix.YouSafe.network.IniciarTreinamentoSessaoRequest
 import com.digitalsix.YouSafe.network.InstrutorUnidadesResponse
 import com.digitalsix.YouSafe.network.SessaoRequest
+import com.digitalsix.YouSafe.network.SincronizarSessaoRequest
 import com.digitalsix.YouSafe.network.TreinamentoRequest
 import com.digitalsix.YouSafe.network.TreinamentoResponse
 import com.digitalsix.YouSafe.network.modulos.moduloResponse
@@ -73,6 +74,11 @@ class MainRepository(private val api: ApiService) {
             ApiResult.Error(e.message ?: "Erro de conexao")
         }
     }
+
+    suspend fun sincronizarSessao(
+        token: String,
+        request: SincronizarSessaoRequest
+    ): ApiResult<Unit> = safeCallUnit { api.sincronizarSessao(token, request) }
 
     suspend fun iniciarTreinamentoSessao(
         token: String,

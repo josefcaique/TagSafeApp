@@ -250,7 +250,42 @@ data class ParticipanteSessao(
     val ativo: Boolean? = null,
 
     @SerializedName("horario_registro")
-    val horarioRegistro: String
+    val horarioRegistro: String,
+
+    @SerializedName("numero_apontamento")
+    val numeroApontamento: Int? = null
+)
+
+data class SincronizarSessaoRequest(
+    @SerializedName("unidade_id")
+    val unidadeId: String,
+
+    @SerializedName("modulo_id")
+    val moduloId: String,
+
+    @SerializedName("treinamento_id")
+    val treinamentoId: String?,
+
+    @SerializedName("ginastica_laboral_id")
+    val ginasticaLaboralId: String?,
+
+    @SerializedName("data_inicio")
+    val dataInicio: String,
+
+    @SerializedName("data_fim")
+    val dataFim: String,
+
+    @SerializedName("quantidade_apontamentos")
+    val quantidadeApontamentos: Int = 1,
+
+    @SerializedName("observacoes")
+    val observacoes: String,
+
+    @SerializedName("participantes")
+    val participantes: List<ParticipanteSessao>,
+
+    @SerializedName("coleta_mobile")
+    val coletaMobile: ColetaMobileRequest
 )
 
 // ==========================================

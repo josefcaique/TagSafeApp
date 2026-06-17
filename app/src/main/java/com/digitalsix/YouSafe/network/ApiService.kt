@@ -69,6 +69,12 @@ interface ApiService {
         @Body request: SessaoRequest
     ): Response<JsonElement>
 
+    @POST("sessoes/sincronizar")
+    suspend fun sincronizarSessao(
+        @Header("Authorization") token: String,
+        @Body request: SincronizarSessaoRequest
+    ): Response<Any>
+
     @POST("sessoes/{uuid}/iniciar-treinamento")
     suspend fun iniciarTreinamentoSessao(
         @Header("Authorization") token: String,
@@ -110,7 +116,7 @@ interface ApiService {
         @Header("Authorization") token: String
     ): Response<List<EmpresaUnidadeResponse>>
 
-    @GET("instrutores/unidades-atendidas/{instrutorId}")
+    @GET("instrutores/unidades_atendidas/{instrutorId}")
     suspend fun getUnidadesAtendidasPorInstrutor(
         @Header("Authorization") token: String,
         @Path("instrutorId") instrutorId: String

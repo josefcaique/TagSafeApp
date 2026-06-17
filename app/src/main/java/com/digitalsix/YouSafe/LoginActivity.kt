@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import com.digitalsix.YouSafe.network.LoginRequest
 import com.digitalsix.YouSafe.network.RetrofitInstance
 import com.digitalsix.YouSafe.utils.SessionManager
+import com.digitalsix.YouSafe.utils.NetworkMonitor
 import org.json.JSONObject
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -47,7 +48,7 @@ class LoginActivity : AppCompatActivity() {
         )
 
         if (sessionManager.isLoggedIn()) {
-            if (sessionManager.isAccessTokenValid()) {
+            if (sessionManager.isAccessTokenValid() || !NetworkMonitor.isOnline(this)) {
                 verificarPrimeiroAcesso()
                 return
             }

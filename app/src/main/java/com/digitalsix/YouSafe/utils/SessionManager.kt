@@ -3,7 +3,11 @@ package com.digitalsix.YouSafe.utils
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import com.digitalsix.YouSafe.network.AbortarAulaRequest
+import com.digitalsix.YouSafe.network.ConfirmarSessaoRequest
 import com.digitalsix.YouSafe.network.ParticipanteSessao
+import com.digitalsix.YouSafe.network.SincronizarSessaoRequest
+import com.digitalsix.YouSafe.network.TreinamentoResponse
 import com.digitalsix.YouSafe.network.Usuario
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -18,7 +22,37 @@ data class AtividadeEmProgresso(
     val moduloNome: String?,
     val participantes: List<ParticipanteSessao> = emptyList(),
     val quantidadeApontamentos: Int = 1,
-    val apontamentoAtual: Int = 1
+    val apontamentoAtual: Int = 1,
+    val offline: Boolean = false,
+    val moduloUuid: String? = null,
+    val treinamentoUuid: String? = null,
+    val ginasticaLaboralUuid: String? = null,
+    val observacoes: String? = null,
+    val dataInicioUtc: String? = null,
+    val instrutorUuid: String? = null
+)
+
+data class SessaoOfflinePendente(
+    val localId: String,
+    val criadaEmMs: Long,
+    val instrutorUuid: String? = null,
+    val descricao: String? = null,
+    val moduloNome: String? = null,
+    val unidadeNome: String? = null,
+    val request: SincronizarSessaoRequest
+)
+
+data class AcaoSessaoPendente(
+    val localId: String,
+    val sessaoUuid: String,
+    val tipo: String,
+    val criadaEmMs: Long,
+    val instrutorUuid: String? = null,
+    val descricao: String? = null,
+    val moduloNome: String? = null,
+    val unidadeNome: String? = null,
+    val confirmarRequest: ConfirmarSessaoRequest? = null,
+    val abortarRequest: AbortarAulaRequest? = null
 )
 
 /**
@@ -43,6 +77,9 @@ class SessionManager(context: Context) {
         private const val KEY_AULA_INICIO_MS = "aula_inicio_ms"
         private const val KEY_ATIVIDADES_EM_PROGRESSO = "atividades_em_progresso"
         private const val KEY_DEVICE_ID = "device_id"
+        private const val KEY_TREINAMENTOS_CACHE = "treinamentos_cache"
+        private const val KEY_SESSOES_OFFLINE_PENDENTES = "sessoes_offline_pendentes"
+        private const val KEY_ACOES_SESSAO_PENDENTES = "acoes_sessao_pendentes"
     }
 
     /**
@@ -157,6 +194,97 @@ class SessionManager(context: Context) {
         }
     }
 
+    fun salvarTreinamentosCache(unidadeUuid: String, treinamentos: List<TreinamentoResponse>) {
+        if (unidadeUuid.isBlank()) return
+        val cache = getTreinamentosCacheCompleto().toMutableMap()
+        cache[unidadeUuid] = treinamentos
+        prefs.edit().putString(KEY_TREINAMENTOS_CACHE, gson.toJson(cache)).apply()
+    }
+
+    fun getTreinamentosCache(unidadeUuid: String): List<TreinamentoResponse> {
+        return getTreinamentosCacheCompleto()[unidadeUuid].orEmpty()
+    }
+
+    private fun getTreinamentosCacheCompleto(): Map<String, List<TreinamentoResponse>> {
+        val json = prefs.getString(KEY_TREINAMENTOS_CACHE, null) ?: return emptyMap()
+        return try {
+            val type = object : TypeToken<Map<String, List<TreinamentoResponse>>>() {}.type
+            gson.fromJson<Map<String, List<TreinamentoResponse>>>(json, type).orEmpty()
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    fun salvarSessaoOfflinePendente(sessao: SessaoOfflinePendente) {
+        val pendentes = getSessoesOfflinePendentes()
+            .filterNot { it.localId == sessao.localId }
+            .plus(sessao)
+            .sortedBy { it.criadaEmMs }
+        prefs.edit()
+            .putString(KEY_SESSOES_OFFLINE_PENDENTES, gson.toJson(pendentes))
+            .apply()
+    }
+
+    fun getSessoesOfflinePendentes(): List<SessaoOfflinePendente> {
+        val json = prefs.getString(KEY_SESSOES_OFFLINE_PENDENTES, null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<SessaoOfflinePendente>>() {}.type
+            gson.fromJson<List<SessaoOfflinePendente>>(json, type).orEmpty()
+                .filter { it.localId.isNotBlank() }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getSessoesOfflinePendentesDoUsuario(): List<SessaoOfflinePendente> {
+        val instrutorUuid = getUsuario()?.instrutorUuid
+        return getSessoesOfflinePendentes().filter {
+            it.instrutorUuid.isNullOrBlank() || it.instrutorUuid == instrutorUuid
+        }
+    }
+
+    fun removerSessaoOfflinePendente(localId: String) {
+        val pendentes = getSessoesOfflinePendentes().filterNot { it.localId == localId }
+        prefs.edit()
+            .putString(KEY_SESSOES_OFFLINE_PENDENTES, gson.toJson(pendentes))
+            .apply()
+    }
+
+    fun salvarAcaoSessaoPendente(acao: AcaoSessaoPendente) {
+        val pendentes = getAcoesSessaoPendentes()
+            .filterNot { it.localId == acao.localId }
+            .plus(acao)
+            .sortedBy { it.criadaEmMs }
+        prefs.edit()
+            .putString(KEY_ACOES_SESSAO_PENDENTES, gson.toJson(pendentes))
+            .apply()
+    }
+
+    fun getAcoesSessaoPendentes(): List<AcaoSessaoPendente> {
+        val json = prefs.getString(KEY_ACOES_SESSAO_PENDENTES, null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<AcaoSessaoPendente>>() {}.type
+            gson.fromJson<List<AcaoSessaoPendente>>(json, type).orEmpty()
+                .filter { it.localId.isNotBlank() && it.sessaoUuid.isNotBlank() }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getAcoesSessaoPendentesDoUsuario(): List<AcaoSessaoPendente> {
+        val instrutorUuid = getUsuario()?.instrutorUuid
+        return getAcoesSessaoPendentes().filter {
+            it.instrutorUuid.isNullOrBlank() || it.instrutorUuid == instrutorUuid
+        }
+    }
+
+    fun removerAcaoSessaoPendente(localId: String) {
+        val pendentes = getAcoesSessaoPendentes().filterNot { it.localId == localId }
+        prefs.edit()
+            .putString(KEY_ACOES_SESSAO_PENDENTES, gson.toJson(pendentes))
+            .apply()
+    }
+
     /**
      * Atualizar dados do usuário (para refresh de unidades atendidas)
      */
@@ -183,8 +311,24 @@ class SessionManager(context: Context) {
      * Limpar sessão (logout)
      */
     fun clearSession() {
+        val deviceId = prefs.getString(KEY_DEVICE_ID, null)
+        val sessoesPendentes = prefs.getString(KEY_SESSOES_OFFLINE_PENDENTES, null)
+        val acoesPendentes = prefs.getString(KEY_ACOES_SESSAO_PENDENTES, null)
+        val atividadesOffline = getAtividadesEmProgresso().filter { it.offline }
         val editor = prefs.edit()
         editor.clear()
+        if (!deviceId.isNullOrBlank()) {
+            editor.putString(KEY_DEVICE_ID, deviceId)
+        }
+        if (!sessoesPendentes.isNullOrBlank()) {
+            editor.putString(KEY_SESSOES_OFFLINE_PENDENTES, sessoesPendentes)
+        }
+        if (!acoesPendentes.isNullOrBlank()) {
+            editor.putString(KEY_ACOES_SESSAO_PENDENTES, acoesPendentes)
+        }
+        if (atividadesOffline.isNotEmpty()) {
+            editor.putString(KEY_ATIVIDADES_EM_PROGRESSO, gson.toJson(atividadesOffline))
+        }
         editor.apply()
     }
 
@@ -240,8 +384,12 @@ class SessionManager(context: Context) {
         }
 
         if (atividades.isNotEmpty()) {
+            val instrutorUuid = getUsuario()?.instrutorUuid
             return atividades
-                .filter { it.uuid.isNotBlank() }
+                .filter {
+                    it.uuid.isNotBlank() &&
+                        (it.instrutorUuid.isNullOrBlank() || it.instrutorUuid == instrutorUuid)
+                }
                 .map { atividade ->
                     val quantidadeApontamentos = atividade.quantidadeApontamentos
                         .takeIf { it in 1..2 }

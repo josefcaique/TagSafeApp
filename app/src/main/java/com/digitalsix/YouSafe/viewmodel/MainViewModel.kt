@@ -171,6 +171,10 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         updateState { it.copy(modulos = modulos) }
     }
 
+    fun definirTreinamentos(treinamentos: List<TreinamentoResponse>) {
+        updateState { it.copy(treinamentos = treinamentos, carregandoTreinamentos = false) }
+    }
+
     fun carregarTreinamentosSeNecessario(token: String, unidadeId: String) {
         if (carregandoTreinamentos) return
         val treinamentosAtual = _uiState.value?.treinamentos.orEmpty()

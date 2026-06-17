@@ -5,6 +5,7 @@
     <!-- Permissões -->
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
@@ -23,6 +24,7 @@
         <!-- LoginActivity como LAUNCHER -->
         <activity
             android:name=".LoginActivity"
+            android:screenOrientation="portrait"
             android:exported="true"
             android:theme="@style/AppTheme"
             android:windowSoftInputMode="stateHidden|adjustResize">
@@ -35,6 +37,7 @@
         <!-- ForgotPasswordActivity -->
         <activity
             android:name=".ForgotPasswordActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:theme="@style/AppTheme"
             android:windowSoftInputMode="stateHidden|adjustResize" />
@@ -42,6 +45,7 @@
         <!-- ResetPasswordActivity -->
         <activity
             android:name=".ResetPasswordActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:theme="@style/AppTheme"
             android:windowSoftInputMode="stateHidden|adjustResize" />
@@ -49,10 +53,11 @@
         <!-- MainActivity -->
         <activity
             android:name=".MainActivity"
-            android:exported="false"
             android:launchMode="singleTop"
             android:theme="@style/AppTheme"
-            android:windowSoftInputMode="stateHidden|adjustResize" >
+            android:windowSoftInputMode="stateHidden|adjustResize"
+            android:exported="true"
+            android:screenOrientation="portrait">
 
             <!-- Intent filters para NFC -->
             <intent-filter>

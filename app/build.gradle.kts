@@ -20,7 +20,7 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
-    }
+    }22965685057
 
     flavorDimensions += "environment"
 

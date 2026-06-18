@@ -393,6 +393,9 @@ data class Usuario(
     )
     val instrutorPublicId: String? = null,
 
+    @SerializedName("unidades")
+    val unidades: List<UnidadeAtendida>? = null,
+
     @SerializedName("unidades_atendidas")
     val unidadesAtendidas: List<UnidadeAtendida>? = null,
 
@@ -424,10 +427,10 @@ data class UnidadeAtendida(
     @SerializedName(value = "public_id", alternate = ["publicId", "uuid"])
     val publicId: String? = null,
 
-    @SerializedName("nome")
+    @SerializedName(value = "nome", alternate = ["descricao", "unidade_nome", "nome_unidade"])
     val nome: String? = null,
 
-    @SerializedName("empresa")
+    @SerializedName(value = "empresa", alternate = ["empresa_nome", "nome_empresa"])
     val empresa: String?,
 
     @SerializedName("modulos")
@@ -496,4 +499,27 @@ data class GetFuncionarioByNFCResponse(
 
     @SerializedName("unidade_id")
     val unidade_id: String?
+)
+
+data class CriarFuncionarioRequest(
+    @SerializedName("nome")
+    val nome: String,
+
+    @SerializedName("nfc")
+    val nfc: String,
+
+    @SerializedName("cpf")
+    val cpf: String,
+
+    @SerializedName("unidade_id")
+    val unidadeId: Int,
+
+    @SerializedName("ativo")
+    val ativo: Boolean = true,
+
+    @SerializedName("setor_descricao")
+    val setorDescricao: String? = null,
+
+    @SerializedName("setor_nivel")
+    val setorNivel: String? = null
 )

@@ -50,6 +50,15 @@
             android:theme="@style/AppTheme"
             android:windowSoftInputMode="stateHidden|adjustResize" />
 
+        <!-- FuncionarioCadastroActivity -->
+        <activity
+            android:name=".FuncionarioCadastroActivity"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+
         <!-- MainActivity -->
         <activity
             android:name=".MainActivity"

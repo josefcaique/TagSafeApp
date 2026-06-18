@@ -2,6 +2,7 @@ package com.digitalsix.YouSafe.network
 
 import com.digitalsix.YouSafe.network.modulos.moduloResponse
 import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.*
@@ -128,6 +129,12 @@ interface ApiService {
         @Path("nfc") nfc: String,
         @Path("unidadeId") unidadeId: String
     ): Response<GetFuncionarioByNFCResponse>
+
+    @POST("funcionarios")
+    suspend fun criarFuncionario(
+        @Header("Authorization") token: String,
+        @Body request: JsonObject
+    ): Response<Any>
 
     @GET("treinamentos/unidade/{unidadeId}")
     suspend fun getTreinamentosByUnidade(

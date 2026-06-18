@@ -14,10 +14,10 @@ data class EmpresaUnidadeResponse(
     @SerializedName("public_id")
     val publicId: String,
 
-    @SerializedName("nome")
+    @SerializedName(value = "nome", alternate = ["empresa", "empresa_nome", "nome_empresa"])
     val nomeEmpresa: String,
 
-    @SerializedName("unidade")
+    @SerializedName(value = "unidade", alternate = ["unidade_nome", "nome_unidade", "descricao"])
     val nomeUnidade: String,
 
     @SerializedName("cnpj")

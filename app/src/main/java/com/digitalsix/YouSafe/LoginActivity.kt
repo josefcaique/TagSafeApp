@@ -18,10 +18,12 @@ import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import com.digitalsix.YouSafe.network.LoginRequest
 import com.digitalsix.YouSafe.network.RetrofitInstance
+import com.digitalsix.YouSafe.network.Usuario
 import com.digitalsix.YouSafe.utils.SessionManager
 import com.digitalsix.YouSafe.utils.NetworkMonitor
 import org.json.JSONObject
 import kotlinx.coroutines.launch
+import java.text.Normalizer
 import kotlin.math.max
 
 class LoginActivity : AppCompatActivity() {
@@ -251,10 +253,31 @@ class LoginActivity : AppCompatActivity() {
         if (usuario.primeiroAcesso) {
             // É primeiro acesso - ir para tela de reset de senha
             irParaResetPassword()
+        } else if (deveIrParaCadastroFuncionario(usuario)) {
+            irParaCadastroFuncionario()
         } else {
             // Não é primeiro acesso - ir para MainActivity
             irParaMainActivity()
         }
+    }
+
+    private fun deveIrParaCadastroFuncionario(usuario: Usuario): Boolean {
+        val roles = usuario.roles.map { normalizarRole(it.nome) }
+        val adminOuPadrao = roles.any {
+            it.contains("admin") ||
+                it.contains("administrador") ||
+                it == "padrao" ||
+                it.contains("usuario padrao") ||
+                it.contains("user")
+        }
+        val temPerfilInstrutor = usuario.instrutorId != null || !usuario.instrutorPublicId.isNullOrBlank()
+        return adminOuPadrao || !temPerfilInstrutor
+    }
+
+    private fun normalizarRole(role: String): String {
+        val semAcento = Normalizer.normalize(role, Normalizer.Form.NFD)
+            .replace(Regex("\\p{Mn}+"), "")
+        return semAcento.lowercase().trim()
     }
 
     private fun irParaResetPassword() {
@@ -266,6 +289,13 @@ class LoginActivity : AppCompatActivity() {
 
     private fun irParaMainActivity() {
         val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun irParaCadastroFuncionario() {
+        val intent = Intent(this, FuncionarioCadastroActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

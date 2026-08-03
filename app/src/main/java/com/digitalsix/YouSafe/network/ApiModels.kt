@@ -84,18 +84,48 @@ data class TreinamentoRequest(
 
 data class TreinamentoResponse(
     @SerializedName("treinamento_id")
-    val treinamentoId: Int,
+    val treinamentoId: Int?,
 
     @SerializedName("public_id")
-    val publicId: String,
+    val publicId: String?,
 
     @SerializedName("nome")
     val nome: String,
 
     @SerializedName("descricao")
-    val descricao: String?
+    val descricao: String?,
+
+    @SerializedName(value = "unidade_id", alternate = ["unidade_public_id", "unidadePublicId"])
+    val unidadeId: String? = null
 ) {
     override fun toString(): String = nome
+}
+
+data class GinasticaLaboralResponse(
+    @SerializedName("ginastica_laboral_id")
+    val ginasticaLaboralId: Int? = null,
+
+    @SerializedName("public_id")
+    val publicId: String? = null,
+
+    @SerializedName(value = "nome", alternate = ["titulo"])
+    val nome: String? = null,
+
+    @SerializedName("descricao")
+    val descricao: String? = null,
+
+    @SerializedName(value = "unidade_id", alternate = ["unidade_public_id", "unidadePublicId"])
+    val unidadeId: String? = null
+) {
+    val nomeExibicao: String
+        get() = nome?.takeIf { it.isNotBlank() }
+            ?: descricao?.takeIf { it.isNotBlank() }
+            ?: publicId.orEmpty()
+
+    val identificador: String?
+        get() = publicId ?: ginasticaLaboralId?.toString()
+
+    override fun toString(): String = nomeExibicao
 }
 
 data class SessaoRequest(

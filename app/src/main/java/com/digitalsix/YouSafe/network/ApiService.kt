@@ -58,6 +58,12 @@ interface ApiService {
         @Body request: GinasticaLaboralRequest
     ): Response<IdResponse>
 
+    @GET("ginastica-laboral/unidade/{unidadeId}")
+    suspend fun getGinasticasLaboraisByUnidade(
+        @Header("Authorization") token: String,
+        @Path("unidadeId") unidadeId: String
+    ): Response<List<GinasticaLaboralResponse>>
+
     @POST("treinamentos")
     suspend fun criarTreinamento(
         @Header("Authorization") token: String,

@@ -47,6 +47,7 @@ import com.digitalsix.YouSafe.utils.NetworkMonitor
 import com.digitalsix.YouSafe.utils.SessaoOfflinePendente
 import com.digitalsix.YouSafe.utils.SessionManager
 import com.digitalsix.YouSafe.viewmodel.AcaoState
+import com.digitalsix.YouSafe.viewmodel.MainUiState
 import com.digitalsix.YouSafe.viewmodel.MainViewModel
 import com.digitalsix.YouSafe.viewmodel.MainViewModelFactory
 import com.google.android.material.appbar.MaterialToolbar
@@ -101,7 +102,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var spinnerModule: AutoCompleteTextView
     private lateinit var layoutSpinnerModule: TextInputLayout
     private lateinit var layoutTreinamentoFields: LinearLayout
+    private lateinit var textViewNomeTreinamentoLabel: TextView
     private lateinit var editTextNomeTreinamento: AutoCompleteTextView
+    private lateinit var cardTipoBatidaContainer: MaterialCardView
     private lateinit var cardBatidaUnica: MaterialCardView
     private lateinit var cardBatidaDupla: MaterialCardView
     private lateinit var radioBatidaUnica: RadioButton
@@ -141,6 +144,8 @@ class MainActivity : AppCompatActivity() {
     private var nfcPendente: String? = null
     private val filaNfcsPendentes = ArrayDeque<String>()
     private var exibirLogoutNoMenu: Boolean = true
+    private var treinamentoUuidSelecionadoEmCriacao: String? = null
+    private var ginasticaLaboralUuidSelecionadaEmCriacao: String? = null
 
     private val timerHandler = Handler(Looper.getMainLooper())
     private var timerRunnable: Runnable? = null
@@ -222,7 +227,9 @@ class MainActivity : AppCompatActivity() {
         spinnerModule = findViewById(R.id.spinnerModule)
         layoutSpinnerModule = findViewById(R.id.layoutSpinnerModule)
         layoutTreinamentoFields = findViewById(R.id.layoutTreinamentoFields)
+        textViewNomeTreinamentoLabel = findViewById(R.id.textViewNomeTreinamentoLabel)
         editTextNomeTreinamento = findViewById(R.id.editTextNomeTreinamento)
+        cardTipoBatidaContainer = findViewById(R.id.cardTipoBatidaContainer)
         cardBatidaUnica = findViewById(R.id.cardBatidaUnica)
         cardBatidaDupla = findViewById(R.id.cardBatidaDupla)
         radioBatidaUnica = findViewById(R.id.radioBatidaUnica)
@@ -478,6 +485,10 @@ class MainActivity : AppCompatActivity() {
         spinnerModule.setOnClickListener { spinnerModule.showDropDown() }
         spinnerModule.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus -> if (hasFocus) spinnerModule.showDropDown() }
 
+        editTextNomeTreinamento.setOnClickListener { editTextNomeTreinamento.showDropDown() }
+        editTextNomeTreinamento.onFocusChangeListener =
+            View.OnFocusChangeListener { _, hasFocus -> if (hasFocus) editTextNomeTreinamento.showDropDown() }
+
         spinnerEmpresa.setOnItemClickListener { parent, _, position, _ ->
             val empresasMap = viewModel.uiState.value?.empresasMap ?: return@setOnItemClickListener
             val empresaNomeSelecionada = parent.getItemAtPosition(position)?.toString()
@@ -523,9 +534,12 @@ class MainActivity : AppCompatActivity() {
     private fun carregarModulos(unidadeUuid: String) {
         val treinamentosCache = sessionManager.getTreinamentosCache(unidadeUuid)
         viewModel.definirTreinamentos(treinamentosCache)
+        val ginasticasCache = sessionManager.getGinasticasLaboraisCache(unidadeUuid)
+        viewModel.definirGinasticasLaborais(ginasticasCache)
         if (isOnline) {
             val token = sessionManager.getTokenWithBearer() ?: return
             viewModel.carregarTreinamentos(token, unidadeUuid)
+            viewModel.carregarGinasticasLaborais(token, unidadeUuid)
         }
 
         val unidade = empresaSelecionada?.unidades?.find { it.publicId == unidadeUuid }
@@ -551,6 +565,8 @@ class MainActivity : AppCompatActivity() {
         spinnerModule.setAdapter(null)
         editTextNomeTreinamento.setText("", false)
         editTextDescricaoAula.setText("")
+        treinamentoUuidSelecionadoEmCriacao = null
+        ginasticaLaboralUuidSelecionadaEmCriacao = null
         selecionarTipoBatida(1)
         layoutSpinnerModule.isEnabled = false
         spinnerModule.isEnabled = false
@@ -559,6 +575,7 @@ class MainActivity : AppCompatActivity() {
         layoutDescricaoAula.visibility = View.GONE
         viewModel.limparModulos()
         viewModel.limparTreinamentos()
+        viewModel.limparGinasticasLaborais()
     }
 
     private fun detectarTipoModulo(modulo: moduloResponse): TipoModulo {
@@ -576,11 +593,26 @@ class MainActivity : AppCompatActivity() {
             TipoModulo.GINASTICA_LABORAL -> {
                 quantidadeApontamentosAtual = 1
                 apontamentoAtual = 1
-                layoutTreinamentoFields.visibility = View.GONE
-                textViewDescricaoLabel.visibility = View.VISIBLE
-                layoutDescricaoAula.visibility = View.VISIBLE
+                textViewNomeTreinamentoLabel.text = "Ginástica laboral"
+                editTextNomeTreinamento.hint = "Selecione uma ginástica laboral"
+                cardTipoBatidaContainer.visibility = View.GONE
+                layoutTreinamentoFields.visibility = View.VISIBLE
+                textViewDescricaoLabel.visibility = View.GONE
+                layoutDescricaoAula.visibility = View.GONE
+                val unidadeUuid = unidadeUuidSelecionada
+                val cache = sessionManager.getGinasticasLaboraisCache(unidadeUuid)
+                if (cache.isNotEmpty()) {
+                    viewModel.definirGinasticasLaborais(cache)
+                }
+                if (isOnline && unidadeUuid != null) {
+                    val token = sessionManager.getTokenWithBearer() ?: return
+                    viewModel.carregarGinasticasLaboraisSeNecessario(token, unidadeUuid)
+                }
             }
             TipoModulo.TREINAMENTO -> {
+                textViewNomeTreinamentoLabel.text = "Nome do treinamento"
+                editTextNomeTreinamento.hint = "Ex: NR-35"
+                cardTipoBatidaContainer.visibility = View.VISIBLE
                 layoutTreinamentoFields.visibility = View.VISIBLE
                 textViewDescricaoLabel.visibility = View.GONE
                 layoutDescricaoAula.visibility = View.GONE
@@ -602,6 +634,7 @@ class MainActivity : AppCompatActivity() {
                 layoutDescricaoAula.visibility = View.GONE
             }
         }
+        atualizarAdapterCatalogoAtividade(viewModel.uiState.value ?: return)
     }
 
     // ==========================================
@@ -632,10 +665,12 @@ class MainActivity : AppCompatActivity() {
                     sessionManager.salvarTreinamentosCache(it, state.treinamentos)
                 }
             }
-            val nomesTreinamentos = state.treinamentos.map { it.nome }
-            val treinamentosAdapter =
-                ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, nomesTreinamentos)
-            editTextNomeTreinamento.setAdapter(treinamentosAdapter)
+            if (state.ginasticasLaborais.isNotEmpty()) {
+                unidadeUuidSelecionada?.let {
+                    sessionManager.salvarGinasticasLaboraisCache(it, state.ginasticasLaborais)
+                }
+            }
+            atualizarAdapterCatalogoAtividade(state)
 
             state.mensagemErro?.let { erro ->
                 Toast.makeText(this, erro, Toast.LENGTH_LONG).show()
@@ -666,13 +701,19 @@ class MainActivity : AppCompatActivity() {
                             moduloNome = moduloSelecionado?.nome,
                             observacoes = obterDescricaoAtividadeAtual(),
                             quantidadeApontamentos = quantidadeApontamentosAtual,
-                            apontamentoAtual = apontamentoAtual
+                            apontamentoAtual = apontamentoAtual,
+                            treinamentoUuid = treinamentoUuidSelecionadoEmCriacao,
+                            ginasticaLaboralUuid = ginasticaLaboralUuidSelecionadaEmCriacao
                         )
                     )
                     mostrarEstadoNFC(limparParticipantes = true)
                     viewModel.consumirCriarSessaoEstado()
                 }
                 is AcaoState.Erro -> {
+                    if (deveEnfileirarPorFalhaConexao(state.mensagem) && iniciarAulaOfflinePorFalhaConexao()) {
+                        viewModel.consumirCriarSessaoEstado()
+                        return@observe
+                    }
                     buttonIniciarAula.isEnabled = true
                     buttonIniciarAula.text = "Iniciar atividade"
                     Toast.makeText(this, state.mensagem, Toast.LENGTH_LONG).show()
@@ -833,6 +874,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun atualizarAdapterCatalogoAtividade(state: MainUiState) {
+        val nomes = when (tipoModuloAtual) {
+            TipoModulo.GINASTICA_LABORAL -> state.ginasticasLaborais.map { it.nomeExibicao }
+            TipoModulo.TREINAMENTO -> state.treinamentos.map { it.nome }
+            TipoModulo.DESCONHECIDO -> emptyList()
+        }
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, nomes)
+        editTextNomeTreinamento.setAdapter(adapter)
+    }
+
     private fun precarregarCatalogosTreinamento(empresasMap: Map<String, EmpresaComUnidades>) {
         val token = sessionManager.getTokenWithBearer() ?: return
         val unidades = empresasMap.values.flatMap { it.unidades }.distinctBy { it.publicId }
@@ -841,6 +892,11 @@ class MainActivity : AppCompatActivity() {
                 when (val result = repository.getTreinamentos(token, unidade.publicId)) {
                     is ApiResult.Success ->
                         sessionManager.salvarTreinamentosCache(unidade.publicId, result.data)
+                    is ApiResult.Error -> Unit
+                }
+                when (val result = repository.getGinasticasLaborais(token, unidade.publicId)) {
+                    is ApiResult.Success ->
+                        sessionManager.salvarGinasticasLaboraisCache(unidade.publicId, result.data)
                     is ApiResult.Error -> Unit
                 }
             }
@@ -917,14 +973,23 @@ class MainActivity : AppCompatActivity() {
         val descricao: String
         val nomeTreinamento: String
         val treinamentoUuid: String?
+        val ginasticaLaboralUuid: String?
 
         when (tipoModuloAtual) {
             TipoModulo.GINASTICA_LABORAL -> {
-                descricao = editTextDescricaoAula.text?.toString()?.trim() ?: ""
-                if (descricao.isBlank()) {
-                    Toast.makeText(this, "Digite uma descrição para a aula.", Toast.LENGTH_SHORT).show()
+                val nomeSelecionado = editTextNomeTreinamento.text?.toString()?.trim() ?: ""
+                if (nomeSelecionado.isBlank()) {
+                    Toast.makeText(this, "Selecione uma ginástica laboral.", Toast.LENGTH_SHORT).show()
                     return
                 }
+                val existente = viewModel.uiState.value?.ginasticasLaborais
+                    ?.find { it.nomeExibicao.equals(nomeSelecionado, ignoreCase = true) }
+                ginasticaLaboralUuid = existente?.identificador
+                if (ginasticaLaboralUuid.isNullOrBlank()) {
+                    Toast.makeText(this, "Selecione uma ginástica laboral do catálogo.", Toast.LENGTH_LONG).show()
+                    return
+                }
+                descricao = existente.nomeExibicao
                 nomeTreinamento = ""
                 treinamentoUuid = null
             }
@@ -939,6 +1004,7 @@ class MainActivity : AppCompatActivity() {
                 treinamentoUuid = existente?.publicId
                 nomeTreinamento = nomeDigitado
                 descricao = nomeDigitado
+                ginasticaLaboralUuid = null
             }
             TipoModulo.DESCONHECIDO -> {
                 Toast.makeText(this, "Tipo de módulo não reconhecido.", Toast.LENGTH_SHORT).show()
@@ -949,11 +1015,14 @@ class MainActivity : AppCompatActivity() {
         quantidadeApontamentosAtual = if (tipoModuloAtual == TipoModulo.TREINAMENTO) obterQuantidadeApontamentosSelecionada() else 1
         apontamentoAtual = 1
 
+        treinamentoUuidSelecionadoEmCriacao = treinamentoUuid
+        ginasticaLaboralUuidSelecionadaEmCriacao = ginasticaLaboralUuid
+
         if (!isOnline) {
-            if (tipoModuloAtual != TipoModulo.TREINAMENTO || treinamentoUuid.isNullOrBlank()) {
+            if (treinamentoUuid.isNullOrBlank() && ginasticaLaboralUuid.isNullOrBlank()) {
                 Toast.makeText(
                     this,
-                    "Offline, selecione um treinamento já existente no catálogo.",
+                    "Offline, selecione uma atividade já existente no catálogo.",
                     Toast.LENGTH_LONG
                 ).show()
                 return
@@ -965,6 +1034,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 },
                 treinamentoUuid = treinamentoUuid,
+                ginasticaLaboralUuid = ginasticaLaboralUuid,
                 observacoes = descricao,
                 quantidadeApontamentos = quantidadeApontamentosAtual
             )
@@ -983,14 +1053,37 @@ class MainActivity : AppCompatActivity() {
                 return
             },
             treinamentoSelecionadoId = treinamentoUuid,
+            ginasticaLaboralSelecionadaId = ginasticaLaboralUuid,
             quantidadeApontamentos = quantidadeApontamentosAtual
         )
+    }
+
+    private fun iniciarAulaOfflinePorFalhaConexao(): Boolean {
+        val unidadeUuid = unidadeUuidSelecionada ?: return false
+        val moduloUuid = moduloSelecionado?.publicId ?: return false
+        val atividadeSelecionada =
+            !treinamentoUuidSelecionadoEmCriacao.isNullOrBlank() ||
+                !ginasticaLaboralUuidSelecionadaEmCriacao.isNullOrBlank()
+        if (!atividadeSelecionada) return false
+
+        isOnline = false
+        atualizarIndicadorConexao()
+        iniciarAulaOffline(
+            unidadeUuid = unidadeUuid,
+            moduloUuid = moduloUuid,
+            treinamentoUuid = treinamentoUuidSelecionadoEmCriacao,
+            ginasticaLaboralUuid = ginasticaLaboralUuidSelecionadaEmCriacao,
+            observacoes = obterDescricaoAtividadeAtual().orEmpty(),
+            quantidadeApontamentos = quantidadeApontamentosAtual
+        )
+        return true
     }
 
     private fun iniciarAulaOffline(
         unidadeUuid: String,
         moduloUuid: String,
-        treinamentoUuid: String,
+        treinamentoUuid: String?,
+        ginasticaLaboralUuid: String?,
         observacoes: String,
         quantidadeApontamentos: Int
     ) {
@@ -1017,6 +1110,7 @@ class MainActivity : AppCompatActivity() {
                 offline = true,
                 moduloUuid = moduloUuid,
                 treinamentoUuid = treinamentoUuid,
+                ginasticaLaboralUuid = ginasticaLaboralUuid,
                 observacoes = observacoes,
                 dataInicioUtc = inicioUtc,
                 instrutorUuid = sessionManager.getUsuario()?.instrutorUuid
@@ -1159,10 +1253,12 @@ class MainActivity : AppCompatActivity() {
         val unidadeUuid = atividade.unidadeUuid
         val moduloUuid = atividade.moduloUuid
         val treinamentoUuid = atividade.treinamentoUuid
+        val ginasticaLaboralUuid = atividade.ginasticaLaboralUuid
         val inicioUtc = sessionManager.getAtividadeEmProgresso(atividade.uuid)?.dataInicioUtc
             ?: atividade.dataInicioUtc
         if (unidadeUuid.isNullOrBlank() || moduloUuid.isNullOrBlank() ||
-            treinamentoUuid.isNullOrBlank() || inicioUtc.isNullOrBlank()
+            (treinamentoUuid.isNullOrBlank() && ginasticaLaboralUuid.isNullOrBlank()) ||
+            inicioUtc.isNullOrBlank()
         ) {
             Toast.makeText(this, "Dados locais incompletos. A atividade não foi encerrada.", Toast.LENGTH_LONG).show()
             return
@@ -1172,7 +1268,7 @@ class MainActivity : AppCompatActivity() {
             unidadeId = unidadeUuid,
             moduloId = moduloUuid,
             treinamentoId = treinamentoUuid,
-            ginasticaLaboralId = null,
+            ginasticaLaboralId = ginasticaLaboralUuid,
             dataInicio = inicioUtc,
             dataFim = obterTimestampUtc(),
             quantidadeApontamentos = atividade.quantidadeApontamentos,
@@ -1577,7 +1673,7 @@ class MainActivity : AppCompatActivity() {
             TipoModulo.TREINAMENTO ->
                 editTextNomeTreinamento.text?.toString()?.trim()?.takeIf { it.isNotBlank() }
             TipoModulo.GINASTICA_LABORAL ->
-                editTextDescricaoAula.text?.toString()?.trim()?.takeIf { it.isNotBlank() }
+                editTextNomeTreinamento.text?.toString()?.trim()?.takeIf { it.isNotBlank() }
             TipoModulo.DESCONHECIDO -> null
         }
     }

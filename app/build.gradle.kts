@@ -11,8 +11,8 @@ android {
         applicationId = "com.digitalsix.YouSafe"
         minSdk = 23
         targetSdk = 35
-        versionCode = 23
-        versionName = "8"
+        versionCode = 26
+        versionName = "9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -20,7 +20,7 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
-    }22965685057
+    }
 
     flavorDimensions += "environment"
 

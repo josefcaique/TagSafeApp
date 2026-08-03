@@ -14,6 +14,7 @@ import com.digitalsix.YouSafe.network.ColetaMobileRequest
 import com.digitalsix.YouSafe.network.ConfirmarSessaoRequest
 import com.digitalsix.YouSafe.network.GetFuncionarioByNFCResponse
 import com.digitalsix.YouSafe.network.GinasticaLaboralRequest
+import com.digitalsix.YouSafe.network.GinasticaLaboralResponse
 import com.digitalsix.YouSafe.network.IniciarTreinamentoSessaoRequest
 import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.UnidadeAtendidaDetalhe
@@ -37,10 +38,12 @@ data class MainUiState(
     val empresasMap: Map<String, EmpresaComUnidades> = emptyMap(),
     val modulos: List<moduloResponse> = emptyList(),
     val treinamentos: List<TreinamentoResponse> = emptyList(),
+    val ginasticasLaborais: List<GinasticaLaboralResponse> = emptyList(),
     val mensagemErro: String? = null,
     val carregandoEmpresas: Boolean = false,
     val carregandoModulos: Boolean = false,
-    val carregandoTreinamentos: Boolean = false
+    val carregandoTreinamentos: Boolean = false,
+    val carregandoGinasticasLaborais: Boolean = false
 )
 
 sealed class AcaoState {
@@ -78,6 +81,8 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
 
     private var treinamentosUnidadeId: String? = null
     private var carregandoTreinamentos = false
+    private var ginasticasLaboraisUnidadeId: String? = null
+    private var carregandoGinasticasLaborais = false
 
     fun carregarEmpresasEUnidades(
         token: String,
@@ -175,6 +180,15 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         updateState { it.copy(treinamentos = treinamentos, carregandoTreinamentos = false) }
     }
 
+    fun definirGinasticasLaborais(ginasticasLaborais: List<GinasticaLaboralResponse>) {
+        updateState {
+            it.copy(
+                ginasticasLaborais = ginasticasLaborais,
+                carregandoGinasticasLaborais = false
+            )
+        }
+    }
+
     fun carregarTreinamentosSeNecessario(token: String, unidadeId: String) {
         if (carregandoTreinamentos) return
         val treinamentosAtual = _uiState.value?.treinamentos.orEmpty()
@@ -185,6 +199,18 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
     fun limparTreinamentos() {
         treinamentosUnidadeId = null
         updateState { it.copy(treinamentos = emptyList()) }
+    }
+
+    fun carregarGinasticasLaboraisSeNecessario(token: String, unidadeId: String) {
+        if (carregandoGinasticasLaborais) return
+        val ginasticasAtual = _uiState.value?.ginasticasLaborais.orEmpty()
+        if (ginasticasLaboraisUnidadeId == unidadeId && ginasticasAtual.isNotEmpty()) return
+        carregarGinasticasLaborais(token, unidadeId)
+    }
+
+    fun limparGinasticasLaborais() {
+        ginasticasLaboraisUnidadeId = null
+        updateState { it.copy(ginasticasLaborais = emptyList()) }
     }
 
     fun limparModulos() {
@@ -204,6 +230,7 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
         instrutorId: String,
         moduloId: String,
         treinamentoSelecionadoId: String?,
+        ginasticaLaboralSelecionadaId: String?,
         quantidadeApontamentos: Int = 1
     ) {
         _criarSessaoState.value = AcaoState.Loading
@@ -213,26 +240,30 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
 
             when (tipoModulo) {
                 TipoModulo.GINASTICA_LABORAL -> {
-                    // Nota: O guia não detalhou POST /ginastica-laboral com UUID,
-                    // mas seguindo a lógica de outros campos de unidade_id
-                    val result = repository.criarGinasticaLaboral(
-                        token,
-                        GinasticaLaboralRequest(descricao = descricao)
-                    )
-                    when (result) {
-                        is ApiResult.Success -> {
-                            val id = result.data.publicId ?: result.data.id
-                            if (id == null) {
-                                _criarSessaoState.value =
-                                    AcaoState.Erro("Resposta sem ID da ginastica laboral")
+                    val existenteId = ginasticaLaboralSelecionadaId
+                    if (existenteId != null) {
+                        ginasticaLaboralId = existenteId
+                        treinamentoId = null
+                    } else {
+                        val result = repository.criarGinasticaLaboral(
+                            token,
+                            GinasticaLaboralRequest(descricao = descricao)
+                        )
+                        when (result) {
+                            is ApiResult.Success -> {
+                                val id = result.data.publicId ?: result.data.id
+                                if (id == null) {
+                                    _criarSessaoState.value =
+                                        AcaoState.Erro("Resposta sem ID da ginastica laboral")
+                                    return@launch
+                                }
+                                ginasticaLaboralId = id
+                                treinamentoId = null
+                            }
+                            is ApiResult.Error -> {
+                                _criarSessaoState.value = AcaoState.Erro(result.message)
                                 return@launch
                             }
-                            ginasticaLaboralId = id
-                            treinamentoId = null
-                        }
-                        is ApiResult.Error -> {
-                            _criarSessaoState.value = AcaoState.Erro(result.message)
-                            return@launch
                         }
                     }
                 }
@@ -423,14 +454,38 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
                 is ApiResult.Error -> {
                     updateState {
                         it.copy(
-                            treinamentos = emptyList(),
-                            carregandoTreinamentos = false,
-                            mensagemErro = result.message
+                            carregandoTreinamentos = false
                         )
                     }
                 }
             }
             carregandoTreinamentos = false
+        }
+    }
+
+    fun carregarGinasticasLaborais(token: String, unidadeId: String) {
+        viewModelScope.launch {
+            carregandoGinasticasLaborais = true
+            updateState { it.copy(carregandoGinasticasLaborais = true, mensagemErro = null) }
+            when (val result = repository.getGinasticasLaborais(token, unidadeId)) {
+                is ApiResult.Success -> {
+                    ginasticasLaboraisUnidadeId = unidadeId
+                    updateState {
+                        it.copy(
+                            ginasticasLaborais = result.data,
+                            carregandoGinasticasLaborais = false
+                        )
+                    }
+                }
+                is ApiResult.Error -> {
+                    updateState {
+                        it.copy(
+                            carregandoGinasticasLaborais = false
+                        )
+                    }
+                }
+            }
+            carregandoGinasticasLaborais = false
         }
     }
 

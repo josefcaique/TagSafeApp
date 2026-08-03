@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Base64
 import com.digitalsix.YouSafe.network.AbortarAulaRequest
 import com.digitalsix.YouSafe.network.ConfirmarSessaoRequest
+import com.digitalsix.YouSafe.network.GinasticaLaboralResponse
 import com.digitalsix.YouSafe.network.ParticipanteSessao
 import com.digitalsix.YouSafe.network.SincronizarSessaoRequest
 import com.digitalsix.YouSafe.network.TreinamentoResponse
@@ -78,6 +79,7 @@ class SessionManager(context: Context) {
         private const val KEY_ATIVIDADES_EM_PROGRESSO = "atividades_em_progresso"
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_TREINAMENTOS_CACHE = "treinamentos_cache"
+        private const val KEY_GINASTICAS_LABORAIS_CACHE = "ginasticas_laborais_cache"
         private const val KEY_SESSOES_OFFLINE_PENDENTES = "sessoes_offline_pendentes"
         private const val KEY_ACOES_SESSAO_PENDENTES = "acoes_sessao_pendentes"
     }
@@ -210,6 +212,30 @@ class SessionManager(context: Context) {
         return try {
             val type = object : TypeToken<Map<String, List<TreinamentoResponse>>>() {}.type
             gson.fromJson<Map<String, List<TreinamentoResponse>>>(json, type).orEmpty()
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    fun salvarGinasticasLaboraisCache(unidadeUuid: String, ginasticas: List<GinasticaLaboralResponse>) {
+        if (unidadeUuid.isBlank()) return
+        val cache = getGinasticasLaboraisCacheCompleto().toMutableMap()
+        cache[unidadeUuid] = ginasticas
+        prefs.edit().putString(KEY_GINASTICAS_LABORAIS_CACHE, gson.toJson(cache)).apply()
+    }
+
+    fun getGinasticasLaboraisCache(unidadeUuid: String? = null): List<GinasticaLaboralResponse> {
+        return unidadeUuid
+            ?.takeIf { it.isNotBlank() }
+            ?.let { getGinasticasLaboraisCacheCompleto()[it] }
+            .orEmpty()
+    }
+
+    private fun getGinasticasLaboraisCacheCompleto(): Map<String, List<GinasticaLaboralResponse>> {
+        val json = prefs.getString(KEY_GINASTICAS_LABORAIS_CACHE, null) ?: return emptyMap()
+        return try {
+            val type = object : TypeToken<Map<String, List<GinasticaLaboralResponse>>>() {}.type
+            gson.fromJson<Map<String, List<GinasticaLaboralResponse>>>(json, type).orEmpty()
         } catch (e: Exception) {
             emptyMap()
         }

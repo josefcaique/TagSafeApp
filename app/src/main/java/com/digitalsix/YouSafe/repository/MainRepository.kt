@@ -6,6 +6,7 @@ import com.digitalsix.YouSafe.network.ConfirmarSessaoRequest
 import com.digitalsix.YouSafe.network.EmpresaUnidadeResponse
 import com.digitalsix.YouSafe.network.GetFuncionarioByNFCResponse
 import com.digitalsix.YouSafe.network.GinasticaLaboralRequest
+import com.digitalsix.YouSafe.network.GinasticaLaboralResponse
 import com.digitalsix.YouSafe.network.IdResponse
 import com.digitalsix.YouSafe.network.IniciarTreinamentoSessaoRequest
 import com.digitalsix.YouSafe.network.InstrutorUnidadesResponse
@@ -34,6 +35,12 @@ class MainRepository(private val api: ApiService) {
         unidadeUuid: String
     ): ApiResult<List<TreinamentoResponse>> =
         safeCallList { api.getTreinamentosByUnidade(token, unidadeUuid) }
+
+    suspend fun getGinasticasLaborais(
+        token: String,
+        unidadeUuid: String
+    ): ApiResult<List<GinasticaLaboralResponse>> =
+        safeCallList { api.getGinasticasLaboraisByUnidade(token, unidadeUuid) }
 
     suspend fun getFuncionarioByNFC(
         token: String,

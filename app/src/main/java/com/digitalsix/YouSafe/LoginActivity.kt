@@ -132,6 +132,7 @@ class LoginActivity : AppCompatActivity() {
                             refreshToken = loginResponse.refreshToken,
                             refreshExpiresAt = loginResponse.refreshExpiresAt
                         )
+                        preCarregarCatalogosOffline(loginResponse.token, loginResponse.usuario)
 
                         Toast.makeText(
                             this@LoginActivity,
@@ -278,6 +279,32 @@ class LoginActivity : AppCompatActivity() {
         val semAcento = Normalizer.normalize(role, Normalizer.Form.NFD)
             .replace(Regex("\\p{Mn}+"), "")
         return semAcento.lowercase().trim()
+    }
+
+    private suspend fun preCarregarCatalogosOffline(token: String, usuario: Usuario) {
+        val bearerToken = "Bearer $token"
+        try {
+            obterUnidadesUsuario(usuario).forEach { unidadeUuid ->
+                val treinamentosResponse = RetrofitInstance.api.getTreinamentosByUnidade(bearerToken, unidadeUuid)
+                if (treinamentosResponse.isSuccessful) {
+                    sessionManager.salvarTreinamentosCache(unidadeUuid, treinamentosResponse.body().orEmpty())
+                }
+
+                val ginasticasResponse =
+                    RetrofitInstance.api.getGinasticasLaboraisByUnidade(bearerToken, unidadeUuid)
+                if (ginasticasResponse.isSuccessful) {
+                    sessionManager.salvarGinasticasLaboraisCache(unidadeUuid, ginasticasResponse.body().orEmpty())
+                }
+            }
+        } catch (e: Exception) {
+            // Login should not fail if the offline catalog preload cannot finish.
+        }
+    }
+
+    private fun obterUnidadesUsuario(usuario: Usuario): List<String> {
+        return (usuario.unidadesAtendidas.orEmpty() + usuario.unidades.orEmpty())
+            .mapNotNull { it.publicId?.takeIf { uuid -> uuid.isNotBlank() } }
+            .distinct()
     }
 
     private fun irParaResetPassword() {

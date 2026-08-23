@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.digitalsix.YouSafe"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.digitalsix.YouSafe"
         minSdk = 23
-        targetSdk = 35
-        versionCode = 26
-        versionName = "9"
+        targetSdk = 36
+        versionCode = 30
+        versionName = "11"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

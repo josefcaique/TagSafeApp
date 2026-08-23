@@ -53,7 +53,10 @@ data class UpdatePasswordResponse(
 
 data class GinasticaLaboralRequest(
     @SerializedName("descricao")
-    val descricao: String
+    val descricao: String,
+
+    @SerializedName("unidade_id")
+    val unidadeId: String
 )
 
 data class TreinamentoRequest(

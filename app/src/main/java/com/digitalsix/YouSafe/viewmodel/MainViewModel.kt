@@ -247,7 +247,10 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
                     } else {
                         val result = repository.criarGinasticaLaboral(
                             token,
-                            GinasticaLaboralRequest(descricao = descricao)
+                            GinasticaLaboralRequest(
+                                descricao = descricao,
+                                unidadeId = unidadeId
+                            )
                         )
                         when (result) {
                             is ApiResult.Success -> {

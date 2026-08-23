@@ -594,7 +594,7 @@ class MainActivity : AppCompatActivity() {
                 quantidadeApontamentosAtual = 1
                 apontamentoAtual = 1
                 textViewNomeTreinamentoLabel.text = "Ginástica laboral"
-                editTextNomeTreinamento.hint = "Selecione uma ginástica laboral"
+                editTextNomeTreinamento.hint = null
                 cardTipoBatidaContainer.visibility = View.GONE
                 layoutTreinamentoFields.visibility = View.VISIBLE
                 textViewDescricaoLabel.visibility = View.GONE
@@ -611,7 +611,7 @@ class MainActivity : AppCompatActivity() {
             }
             TipoModulo.TREINAMENTO -> {
                 textViewNomeTreinamentoLabel.text = "Nome do treinamento"
-                editTextNomeTreinamento.hint = "Ex: NR-35"
+                editTextNomeTreinamento.hint = null
                 cardTipoBatidaContainer.visibility = View.VISIBLE
                 layoutTreinamentoFields.visibility = View.VISIBLE
                 textViewDescricaoLabel.visibility = View.GONE
@@ -985,11 +985,7 @@ class MainActivity : AppCompatActivity() {
                 val existente = viewModel.uiState.value?.ginasticasLaborais
                     ?.find { it.nomeExibicao.equals(nomeSelecionado, ignoreCase = true) }
                 ginasticaLaboralUuid = existente?.identificador
-                if (ginasticaLaboralUuid.isNullOrBlank()) {
-                    Toast.makeText(this, "Selecione uma ginástica laboral do catálogo.", Toast.LENGTH_LONG).show()
-                    return
-                }
-                descricao = existente.nomeExibicao
+                descricao = existente?.nomeExibicao ?: nomeSelecionado
                 nomeTreinamento = ""
                 treinamentoUuid = null
             }
@@ -1064,7 +1060,16 @@ class MainActivity : AppCompatActivity() {
         val atividadeSelecionada =
             !treinamentoUuidSelecionadoEmCriacao.isNullOrBlank() ||
                 !ginasticaLaboralUuidSelecionadaEmCriacao.isNullOrBlank()
-        if (!atividadeSelecionada) return false
+        if (!atividadeSelecionada) {
+            isOnline = false
+            atualizarIndicadorConexao()
+            Toast.makeText(
+                this,
+                "Sem conexão, selecione uma atividade já existente no catálogo.",
+                Toast.LENGTH_LONG
+            ).show()
+            return true
+        }
 
         isOnline = false
         atualizarIndicadorConexao()

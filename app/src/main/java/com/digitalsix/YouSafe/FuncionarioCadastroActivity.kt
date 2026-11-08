@@ -14,6 +14,9 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.widget.doAfterTextChanged
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -28,11 +31,45 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.gson.JsonObject
+import com.digitalsix.YouSafe.face.FaceCamera
+import com.digitalsix.YouSafe.face.FaceRules
+import com.digitalsix.YouSafe.registration.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import kotlin.math.max
 
 class FuncionarioCadastroActivity : AppCompatActivity() {
+
+    private val cadastroFacial get() = checkFacial.isChecked
+    private lateinit var checkNfc: android.widget.CheckBox
+    private lateinit var checkFacial: android.widget.CheckBox
+    private lateinit var cadastroStatus: TextView
+    private lateinit var fotoStatus: TextView
+    private lateinit var buttonFoto: MaterialButton
+    private lateinit var draftStore: RegistrationDraftStore
+    private var draft = RegistrationDraft()
+    private var restaurando = true
+    private var carregando = false
+    private var mensagemErro: String? = null
+    private var capturaPara: String? = null
+    private val cadastroPendente get() = draft.employeePublicId != null || draft.creationUncertain
+    private val capturaFacial = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val name = result.data?.getStringExtra(FaceEnrollmentActivity.EXTRA_PHOTO_NAME)
+        val photo = RegistrationPhotos.find(this, name)
+        val accepted = result.data?.getStringExtra(FaceEnrollmentActivity.EXTRA_CONSENT_AT)
+        if (!::checkFacial.isInitialized) { photo?.delete(); return@registerForActivityResult }
+        if (result.resultCode == RESULT_OK && photo != null && !accepted.isNullOrBlank() &&
+            cadastroFacial && capturaPara == identidadeAtual()) {
+            RegistrationPhotos.find(this, draft.photoName)?.takeIf { it != photo }?.delete()
+            draft = draft.copy(photoName = name, consentAt = accepted)
+            mensagemErro = null
+            guardarRascunho()
+        } else photo?.delete()
+        capturaPara = null
+        atualizarFormulario()
+    }
 
     private lateinit var sessionManager: SessionManager
     private var nfcAdapter: NfcAdapter? = null
@@ -71,6 +108,9 @@ class FuncionarioCadastroActivity : AppCompatActivity() {
             return
         }
 
+        val owner = sessionManager.getUsuario()?.let { it.publicId ?: it.email ?: it.id.toString() }.orEmpty()
+        draftStore = RegistrationDraftStore(this, owner)
+        capturaPara = savedInstanceState?.getString("capture_identity")
         inicializarViews()
         configurarToolbar()
         configurarInsetsTeclado()
@@ -79,10 +119,21 @@ class FuncionarioCadastroActivity : AppCompatActivity() {
         configurarBotoes()
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
-        atualizarStatusNfc()
+        restaurarRascunho()
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (carregando) Toast.makeText(this@FuncionarioCadastroActivity, R.string.registration_wait, Toast.LENGTH_SHORT).show()
+                else { guardarRascunho(); finish() }
+            }
+        })
     }
 
     private fun inicializarViews() {
+        checkNfc = findViewById(R.id.checkAdicionarNfc)
+        checkFacial = findViewById(R.id.checkCadastroFacial)
+        cadastroStatus = findViewById(R.id.textViewCadastroStatus)
+        fotoStatus = findViewById(R.id.textViewFotoCadastro)
+        buttonFoto = findViewById(R.id.buttonFotoCadastro)
         funcionarioCadastroScrollView = findViewById(R.id.funcionarioCadastroScrollView)
         toolbar = findViewById(R.id.toolbarCadastroFuncionario)
         textViewBemVindoCadastro = findViewById(R.id.textViewBemVindoCadastro)
@@ -164,47 +215,153 @@ class FuncionarioCadastroActivity : AppCompatActivity() {
             }
 
         usuario.unidadeId?.takeIf { it > 0 }?.let { id ->
-            unidades.putIfAbsent(
-                id,
+            unidades.getOrPut(id) {
                 UnidadeCadastro(
                     id = id,
                     publicId = usuario.unidadePublicId?.takeIf { it.isNotBlank() }
                 )
-            )
+            }
         }
 
         usuario.unidadesIds.orEmpty()
             .filter { it > 0 }
             .forEachIndexed { index, id ->
-                unidades.putIfAbsent(
-                    id,
+                unidades.getOrPut(id) {
                     UnidadeCadastro(
                         id = id,
                         publicId = usuario.unidadesPublicIds.orEmpty().getOrNull(index)
                             ?.takeIf { it.isNotBlank() }
                     )
-                )
+                }
             }
 
         return unidades.values.toList()
     }
 
     private fun selecionarUnidade(unidade: UnidadeCadastro) {
+        if (!restaurando && unidadeSelecionada?.id != unidade.id) invalidarFoto()
         unidadeSelecionada = unidade
         textViewUnidadeCadastro.text = "Cadastro vinculado à ${unidade.nomeExibicao}."
         layoutUnidadeFuncionario.error = null
-        buttonCadastrarFuncionario.isEnabled = true
+        if (!restaurando) { guardarRascunho(); atualizarFormulario() }
     }
 
     private fun configurarBotoes() {
-        buttonLimparNfc.setOnClickListener {
-            editTextNfcFuncionario.setText("")
-            atualizarStatusNfc()
+        checkNfc.setOnCheckedChangeListener { _, checked ->
+            if (restaurando) return@setOnCheckedChangeListener
+            mensagemErro = null
+            if (checked) ativarNFC() else { editTextNfcFuncionario.setText(""); desativarNFC() }
+            guardarRascunho(); atualizarFormulario()
         }
+        checkFacial.setOnCheckedChangeListener { _, checked ->
+            if (restaurando) return@setOnCheckedChangeListener
+            mensagemErro = null
+            if (!checked) invalidarFoto()
+            guardarRascunho(); atualizarFormulario()
+            if (checked && !fotoPronta()) abrirCapturaFacial()
+        }
+        buttonFoto.setOnClickListener { abrirCapturaFacial() }
+        buttonLimparNfc.setOnClickListener { editTextNfcFuncionario.setText("") }
+        buttonCadastrarFuncionario.setOnClickListener { cadastrarFuncionario() }
+        listOf(editTextNomeFuncionario, editTextCpfFuncionario).forEach { field ->
+            field.doAfterTextChanged {
+                if (!restaurando && !carregando && !cadastroPendente) {
+                    invalidarFoto(); mensagemErro = null; guardarRascunho(); atualizarFormulario()
+                }
+            }
+        }
+        listOf(editTextNfcFuncionario, editTextSetorDescricao, editTextSetorNivel).forEach { field ->
+            field.doAfterTextChanged {
+                if (!restaurando && !carregando && !cadastroPendente) {
+                    mensagemErro = null; guardarRascunho(); atualizarFormulario()
+                }
+            }
+        }
+    }
 
-        buttonCadastrarFuncionario.setOnClickListener {
-            cadastrarFuncionario()
+    private fun identidadeAtual() = listOf(
+        editTextNomeFuncionario.text?.toString()?.trim(),
+        editTextCpfFuncionario.text?.toString()?.filter { it.isDigit() }, unidadeSelecionada?.id
+    ).joinToString("|")
+
+    private fun abrirCapturaFacial() {
+        if (carregando || !cadastroFacial) return
+        capturaPara = identidadeAtual()
+        guardarRascunho()
+        capturaFacial.launch(Intent(this, FaceEnrollmentActivity::class.java)
+            .putExtra("funcionario_nome", editTextNomeFuncionario.text?.toString()?.trim()))
+    }
+
+    private fun fotoPronta() = draft.consentAt?.isNotBlank() == true &&
+        RegistrationPhotos.find(this, draft.photoName) != null
+
+    private fun invalidarFoto() {
+        RegistrationPhotos.find(this, draft.photoName)?.delete()
+        draft = draft.copy(photoName = null, consentAt = null)
+    }
+
+    private fun guardarRascunho(): Boolean {
+        if (restaurando || !::draftStore.isInitialized) return true
+        draft = draft.copy(
+            name = editTextNomeFuncionario.text?.toString().orEmpty(),
+            cpf = editTextCpfFuncionario.text?.toString().orEmpty(),
+            nfc = editTextNfcFuncionario.text?.toString().orEmpty(),
+            sector = editTextSetorDescricao.text?.toString().orEmpty(),
+            level = editTextSetorNivel.text?.toString().orEmpty(), unitId = unidadeSelecionada?.id,
+            useNfc = checkNfc.isChecked, useFace = cadastroFacial
+        )
+        return runCatching { draftStore.save(draft); true }.getOrElse {
+            mensagemErro = getString(R.string.registration_storage_failed); false
         }
+    }
+
+    private fun restaurarRascunho() {
+        draftStore.load()?.let { saved ->
+            draft = saved
+            editTextNomeFuncionario.setText(saved.name); editTextCpfFuncionario.setText(saved.cpf)
+            editTextNfcFuncionario.setText(saved.nfc); editTextSetorDescricao.setText(saved.sector)
+            editTextSetorNivel.setText(saved.level)
+            checkNfc.isChecked = saved.useNfc; checkFacial.isChecked = saved.useFace
+            val unit = unidadesCadastro.find { it.id == saved.unitId }
+            unidadeSelecionada = unit
+            if (unit != null) selecionarUnidade(unit)
+            spinnerUnidadeFuncionario.setText(unit?.nomeExibicao.orEmpty(), false)
+        }
+        restaurando = false
+        atualizarFormulario()
+    }
+
+    private fun atualizarFormulario() {
+        if (!::buttonCadastrarFuncionario.isInitialized) return
+        val locked = carregando || cadastroPendente
+        checkNfc.isEnabled = !locked; checkFacial.isEnabled = !locked
+        spinnerUnidadeFuncionario.isEnabled = !locked && unidadesCadastro.isNotEmpty()
+        listOf(editTextNomeFuncionario, editTextCpfFuncionario, editTextNfcFuncionario,
+            editTextSetorDescricao, editTextSetorNivel).forEach { it.isEnabled = !locked }
+        buttonLimparNfc.isEnabled = !locked
+        buttonFoto.isEnabled = !carregando && !draft.creationUncertain
+        findViewById<View>(R.id.cardNfcCadastro).visibility = if (checkNfc.isChecked) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.layoutFotoCadastro).visibility = if (cadastroFacial) View.VISIBLE else View.GONE
+        fotoStatus.setText(if (fotoPronta()) R.string.registration_photo_saved else R.string.registration_photo_required)
+        buttonFoto.setText(if (fotoPronta()) R.string.registration_retake_face else R.string.registration_capture_face)
+        val ready = RegistrationRules.ready(checkNfc.isChecked, editTextNfcFuncionario.text?.toString(), cadastroFacial, fotoPronta())
+        buttonCadastrarFuncionario.isEnabled = !carregando && unidadeSelecionada != null && (draft.creationUncertain || ready)
+        buttonCadastrarFuncionario.setText(when {
+            carregando -> R.string.registration_wait
+            draft.creationUncertain -> R.string.registration_check
+            draft.employeePublicId != null -> R.string.registration_finish_face
+            else -> R.string.registration_submit
+        })
+        cadastroStatus.text = mensagemErro ?: getString(when {
+            carregando -> R.string.registration_wait
+            draft.creationUncertain -> R.string.registration_uncertain
+            draft.employeePublicId != null -> R.string.registration_pending_face
+            !checkNfc.isChecked && !cadastroFacial -> R.string.registration_choose_method
+            checkNfc.isChecked && editTextNfcFuncionario.text.isNullOrBlank() -> R.string.registration_nfc_required
+            cadastroFacial && !fotoPronta() -> R.string.registration_photo_required
+            else -> R.string.registration_ready
+        })
+        atualizarStatusNfc()
     }
 
     private fun configurarInsetsTeclado() {
@@ -234,6 +391,7 @@ class FuncionarioCadastroActivity : AppCompatActivity() {
         editTextCpfFuncionario.onFocusChangeListener = focusListener
         editTextSetorDescricao.onFocusChangeListener = focusListener
         editTextSetorNivel.onFocusChangeListener = focusListener
+        editTextNfcFuncionario.onFocusChangeListener = focusListener
     }
 
     private fun garantirVisibilidadeDoFoco(target: View) {
@@ -290,7 +448,7 @@ class FuncionarioCadastroActivity : AppCompatActivity() {
             action == NfcAdapter.ACTION_TECH_DISCOVERED
         ) {
             val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
-            tag?.let {
+            tag?.takeIf { checkNfc.isChecked && !carregando && !cadastroPendente }?.let {
                 val nfcId = it.id.joinToString("") { byte -> "%02X".format(byte) }
                 editTextNfcFuncionario.setText(nfcId)
                 textViewNfcStatus.text = "Crachá lido: $nfcId"
@@ -300,6 +458,8 @@ class FuncionarioCadastroActivity : AppCompatActivity() {
     }
 
     private fun ativarNFC() {
+        if (!::checkNfc.isInitialized || !checkNfc.isChecked || carregando || cadastroPendente ||
+            !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return
         val adapter = nfcAdapter ?: return
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -318,70 +478,107 @@ class FuncionarioCadastroActivity : AppCompatActivity() {
     }
 
     private fun atualizarStatusNfc() {
+        if (!::textViewNfcStatus.isInitialized) return
         val nfc = editTextNfcFuncionario.text?.toString().orEmpty()
         textViewNfcStatus.text = when {
-            nfc.isNotBlank() -> "Crachá lido: $nfc"
-            nfcAdapter == null -> "Este aparelho não possui NFC."
-            nfcAdapter?.isEnabled == false -> "Ative o NFC do aparelho para ler o crachá."
-            else -> "Aproxime o crachá do celular para preencher o NFC."
+            nfc.isNotBlank() -> "NFC informado: $nfc"
+            nfcAdapter == null -> "Informe o código do crachá no campo abaixo."
+            nfcAdapter?.isEnabled == false -> "Informe o código ou ative o NFC para ler o crachá."
+            else -> "Informe o código ou aproxime o crachá do celular."
         }
     }
 
     private fun cadastrarFuncionario() {
-        val token = sessionManager.getTokenWithBearer()
-        val unidade = unidadeSelecionada
-        if (token == null || unidade == null) {
-            layoutUnidadeFuncionario.error = "Selecione uma unidade"
-            return
-        }
-
+        if (carregando) return
+        if (draft.creationUncertain) { verificarCadastroInterrompido(); return }
+        val token = sessionManager.getTokenWithBearer() ?: return
+        val unidade = unidadeSelecionada ?: return
         val nome = editTextNomeFuncionario.text?.toString()?.trim().orEmpty()
         val cpf = editTextCpfFuncionario.text?.toString()?.filter { it.isDigit() }.orEmpty()
-        val nfc = editTextNfcFuncionario.text?.toString()?.trim().orEmpty()
-        val setorDescricao = editTextSetorDescricao.text?.toString()?.trim()?.takeIf { it.isNotBlank() }
-        val setorNivel = editTextSetorNivel.text?.toString()?.trim()?.takeIf { it.isNotBlank() }
-
-        if (!validarCampos(nome, cpf, nfc)) return
-
-        val request = JsonObject().apply {
-            addProperty("nome", nome)
-            addProperty("nfc", nfc)
-            addProperty("cpf", cpf)
-            addProperty("unidade_id", unidade.publicId ?: unidade.id.toString())
-            addProperty("ativo", true)
-            setorDescricao?.let { addProperty("setor_descricao", it) }
-            setorNivel?.let { addProperty("setor_nivel", it) }
+        if (!validarCampos(nome, cpf)) return
+        if (!RegistrationRules.ready(checkNfc.isChecked, editTextNfcFuncionario.text?.toString(), cadastroFacial, fotoPronta())) {
+            mensagemErro = getString(R.string.registration_complete_methods); atualizarFormulario(); return
         }
-
-        definirCarregando(true)
+        if (!FaceRules.isPublicId(unidade.publicId)) {
+            layoutUnidadeFuncionario.error = "Unidade sem UUID público. Atualize os dados antes de cadastrar."; return
+        }
+        if (!guardarRascunho()) { atualizarFormulario(); return }
+        val request = JsonObject().apply {
+            addProperty("nome", nome); addProperty("cpf", cpf)
+            addProperty("nfc", if (checkNfc.isChecked) editTextNfcFuncionario.text?.toString()?.trim() else null)
+            addProperty("unidade_id", unidade.publicId); addProperty("ativo", true)
+            editTextSetorDescricao.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { addProperty("setor_descricao", it) }
+            editTextSetorNivel.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { addProperty("setor_nivel", it) }
+        }
+        val includeFace = cadastroFacial
+        val photo = RegistrationPhotos.find(this, draft.photoName)
+        mensagemErro = null; definirCarregando(true)
         lifecycleScope.launch {
             try {
-                val response = RetrofitInstance.api.criarFuncionario(token, request)
-                if (response.isSuccessful) {
-                    Toast.makeText(
-                        this@FuncionarioCadastroActivity,
-                        "Funcionário cadastrado com sucesso.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    limparFormulario()
-                } else {
-                    val mensagem = extrairMensagemErro(response.errorBody()?.string())
-                        ?: "Erro ao cadastrar funcionário (${response.code()})."
-                    Toast.makeText(this@FuncionarioCadastroActivity, mensagem, Toast.LENGTH_LONG).show()
+                // Validate the saved photo before creating any employee on the API.
+                val part = if (includeFace) withContext(Dispatchers.IO) { FaceCamera.multipart(requireNotNull(photo)) } else null
+                val enrollment = FuncionarioRegistration(RetrofitInstance.api, RetrofitInstance.faceApi).submit(
+                    token, request, includeFace, part, draft.consentAt, draft.employeePublicId,
+                    beforeCreate = {
+                        draft = draft.copy(creationUncertain = true)
+                        check(guardarRascunho()) { getString(R.string.registration_storage_failed) }
+                    },
+                    createRejected = { draft = draft.copy(creationUncertain = false); guardarRascunho() },
+                    employeeCreated = { id ->
+                        draft = draft.copy(employeePublicId = id, creationUncertain = false)
+                        check(guardarRascunho()) { getString(R.string.registration_storage_failed) }
+                    }
+                )
+                enrollment?.let { id ->
+                    getSharedPreferences("face_enrollment_records", MODE_PRIVATE).edit()
+                        .putString(id, draft.employeePublicId).apply()
                 }
+                limparFormulario()
+                Toast.makeText(this@FuncionarioCadastroActivity, R.string.registration_success, Toast.LENGTH_LONG).show()
+            } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
-                Toast.makeText(
-                    this@FuncionarioCadastroActivity,
-                    "Erro de conexão: ${e.localizedMessage}",
-                    Toast.LENGTH_LONG
-                ).show()
-            } finally {
-                definirCarregando(false)
-            }
+                mensagemErro = when {
+                    e is RegistrationFailure || e is IllegalArgumentException -> e.message
+                    draft.creationUncertain -> getString(R.string.registration_uncertain)
+                    draft.employeePublicId != null -> getString(R.string.registration_pending_face)
+                    else -> "Não foi possível concluir o cadastro. Verifique a conexão."
+                }
+            } finally { definirCarregando(false) }
         }
     }
 
-    private fun validarCampos(nome: String, cpf: String, nfc: String): Boolean {
+    private fun verificarCadastroInterrompido() {
+        val token = sessionManager.getTokenWithBearer() ?: return
+        val unit = unidadeSelecionada?.publicId?.takeIf(FaceRules::isPublicId) ?: return
+        val cpf = editTextCpfFuncionario.text?.toString()?.filter { it.isDigit() }.orEmpty()
+        mensagemErro = null; definirCarregando(true)
+        lifecycleScope.launch {
+            var continuar = false
+            try {
+                val response = RetrofitInstance.api.buscarFuncionariosCadastro(token, unit)
+                check(response.isSuccessful && response.body() != null)
+                val matches = response.body().orEmpty().filter { it.cpf?.filter(Char::isDigit) == cpf }
+                when {
+                    matches.size == 1 && RegistrationRules.matchesRecovery(matches[0], draft.name, cpf,
+                        if (checkNfc.isChecked) draft.nfc else null) -> {
+                        draft = draft.copy(employeePublicId = matches[0].publicId, creationUncertain = false)
+                        if (cadastroFacial) { check(guardarRascunho()); continuar = true }
+                        else { limparFormulario(); Toast.makeText(this@FuncionarioCadastroActivity, R.string.registration_success, Toast.LENGTH_LONG).show() }
+                    }
+                    matches.isEmpty() -> {
+                        draft = draft.copy(creationUncertain = false); guardarRascunho()
+                        mensagemErro = getString(R.string.registration_not_found)
+                    }
+                    else -> mensagemErro = getString(R.string.registration_check_failed)
+                }
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) { mensagemErro = getString(R.string.registration_check_failed)
+            } finally { definirCarregando(false) }
+            if (continuar) cadastrarFuncionario()
+        }
+    }
+
+    private fun validarCampos(nome: String, cpf: String): Boolean {
         return when {
             nome.isBlank() -> {
                 editTextNomeFuncionario.error = "Informe o nome"
@@ -395,49 +592,47 @@ class FuncionarioCadastroActivity : AppCompatActivity() {
                 editTextCpfFuncionario.error = "CPF deve ter 11 dígitos"
                 false
             }
-            nfc.isBlank() -> {
-                Toast.makeText(this, "Leia o crachá NFC antes de cadastrar.", Toast.LENGTH_SHORT).show()
-                false
-            }
             else -> true
         }
     }
 
-    private fun definirCarregando(carregando: Boolean) {
-        progressBarCadastroFuncionario.visibility = if (carregando) View.VISIBLE else View.GONE
-        buttonCadastrarFuncionario.isEnabled = !carregando && unidadeSelecionada != null
-        buttonCadastrarFuncionario.text = if (carregando) "Cadastrando..." else "Cadastrar funcionário"
+    private fun definirCarregando(value: Boolean) {
+        carregando = value
+        progressBarCadastroFuncionario.visibility = if (value) View.VISIBLE else View.GONE
+        if (value) desativarNFC() else ativarNFC()
+        atualizarFormulario()
     }
 
     private fun limparFormulario() {
-        editTextNomeFuncionario.setText("")
-        editTextCpfFuncionario.setText("")
-        editTextNfcFuncionario.setText("")
-        editTextSetorDescricao.setText("")
-        editTextSetorNivel.setText("")
-        atualizarStatusNfc()
+        restaurando = true
+        invalidarFoto(); draftStore.clear(); draft = RegistrationDraft()
+        editTextNomeFuncionario.setText(""); editTextCpfFuncionario.setText("")
+        editTextNfcFuncionario.setText(""); editTextSetorDescricao.setText(""); editTextSetorNivel.setText("")
+        checkNfc.isChecked = false; checkFacial.isChecked = false
+        mensagemErro = null; restaurando = false
     }
 
-    private fun extrairMensagemErro(errorBody: String?): String? {
-        if (errorBody.isNullOrBlank()) return null
-        return try {
-            val json = JSONObject(errorBody)
-            when {
-                json.has("message") -> json.optString("message")
-                json.has("mensagem") -> json.optString("mensagem")
-                json.has("error") -> json.optString("error")
-                else -> null
-            }?.takeIf { it.isNotBlank() }
-        } catch (e: Exception) {
-            errorBody.takeIf { it.length <= 160 }
-        }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (::draftStore.isInitialized) guardarRascunho()
+        outState.putString("capture_identity", capturaPara)
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        if (!::draftStore.isInitialized) { super.onRestoreInstanceState(savedInstanceState); return }
+        restaurando = true
+        super.onRestoreInstanceState(savedInstanceState)
+        restaurando = false
+        atualizarFormulario()
     }
 
     private fun confirmarLogout() {
+        if (carregando) return
         AlertDialog.Builder(this)
             .setTitle("Sair")
             .setMessage("Deseja realmente sair?")
             .setPositiveButton("Sair") { _, _ ->
+                if (!cadastroPendente) { invalidarFoto(); draftStore.clear() }
                 sessionManager.clearSession()
                 irParaLogin()
             }

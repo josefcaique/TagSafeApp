@@ -30,7 +30,8 @@ data class AtividadeEmProgresso(
     val ginasticaLaboralUuid: String? = null,
     val observacoes: String? = null,
     val dataInicioUtc: String? = null,
-    val instrutorUuid: String? = null
+    val instrutorUuid: String? = null,
+    val metodoPresenca: String? = "nfc"
 )
 
 data class SessaoOfflinePendente(

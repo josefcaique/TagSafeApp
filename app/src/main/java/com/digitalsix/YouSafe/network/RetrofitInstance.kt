@@ -51,6 +51,16 @@ object RetrofitInstance {
         retrofit.create(ApiService::class.java)
     }
 
+    // Face inference can take longer than the ordinary API. Do not automatically replay uploads.
+    val faceApi: ApiService by lazy {
+        retrofit.newBuilder()
+            .client(okHttpClient.newBuilder()
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .retryOnConnectionFailure(false)
+                .build())
+            .build().create(ApiService::class.java)
+    }
+
     private class TokenAuthenticator : Authenticator {
         override fun authenticate(route: Route?, response: Response): Request? {
             val requestOriginal = response.request()

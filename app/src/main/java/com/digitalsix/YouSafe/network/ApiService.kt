@@ -2,7 +2,8 @@ package com.digitalsix.YouSafe.network
 
 import com.digitalsix.YouSafe.network.modulos.moduloResponse
 import com.google.gson.JsonElement
-import com.google.gson.JsonObject
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.*
@@ -136,11 +137,46 @@ interface ApiService {
         @Path("unidadeId") unidadeId: String
     ): Response<GetFuncionarioByNFCResponse>
 
+    @GET("funcionarios")
+    suspend fun buscarFuncionariosCadastro(
+        @Header("Authorization") token: String,
+        @Query("unidade_id") unidadePublicId: String
+    ): Response<List<FuncionarioCadastroResumo>>
+
     @POST("funcionarios")
     suspend fun criarFuncionario(
         @Header("Authorization") token: String,
-        @Body request: JsonObject
-    ): Response<Any>
+        @Body request: RequestBody
+    ): Response<JsonElement>
+
+    @Multipart
+    @POST("face-recognition/enrollments")
+    suspend fun cadastrarRosto(
+        @Header("Authorization") token: String,
+        @Part file: MultipartBody.Part,
+        @Part("funcionario_id") funcionarioPublicId: RequestBody,
+        @Part("consent_given_at") consentGivenAt: RequestBody
+    ): Response<FaceEnrollment>
+
+    @Multipart
+    @POST("face-recognition/sessoes/{uuid}/attendance")
+    suspend fun registrarPresencaFacial(
+        @Header("Authorization") token: String,
+        @Path("uuid") sessaoPublicId: String,
+        @Part file: MultipartBody.Part
+    ): Response<FaceMatch>
+
+    @GET("face-recognition/sessoes/{uuid}/attendance")
+    suspend fun listarPresencasFaciais(
+        @Header("Authorization") token: String,
+        @Path("uuid") sessaoPublicId: String
+    ): Response<FaceAttendanceList>
+
+    @DELETE("face-recognition/enrollments/{id}")
+    suspend fun excluirRosto(
+        @Header("Authorization") token: String,
+        @Path("id") enrollmentId: String
+    ): Response<FaceDeletion>
 
     @GET("treinamentos/unidade/{unidadeId}")
     suspend fun getTreinamentosByUnidade(

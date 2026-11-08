@@ -8,12 +8,10 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.digitalsix.YouSafe"
         minSdk = 23
         targetSdk = 36
-        versionCode = 30
+        versionCode = 32
         versionName = "11"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -22,19 +20,39 @@ android {
         buildConfig = true
     }
 
-    flavorDimensions += "environment"
+    flavorDimensions += listOf("app", "environment")
 
     productFlavors {
+        // --- Dimensão de APP ---
+        create("tagsafe") {
+            dimension = "app"
+            applicationId = "com.digitalsix.YouSafe"
+            manifestPlaceholders["appLabel"] = "TagSafe"
+        }
+
+        create("tagsafedemo") {
+            dimension = "app"
+            applicationId = "com.digitalsix.TagsafeDemo"
+            manifestPlaceholders["appLabel"] = "TagSafe Demo"
+        }
+
+        // --- Dimensão de AMBIENTE ---
         create("staging") {
             dimension = "environment"
-            // Mantemos o mesmo applicationId para a mesma ficha da Play Store
             buildConfigField("String", "BASE_URL", "\"https://dev.api.tagsafeapplication.com/\"")
-            resValue("string", "app_name", "TagSafe Staging")
+            manifestPlaceholders["appLabelSuffix"] = " Staging"
         }
+
         create("production") {
             dimension = "environment"
             buildConfigField("String", "BASE_URL", "\"https://api.tagsafeapplication.com/\"")
-            resValue("string", "app_name", "TagSafe")
+            manifestPlaceholders["appLabelSuffix"] = ""
+        }
+
+        create("demo") {
+            dimension = "environment"
+            buildConfigField("String", "BASE_URL", "\"https://demo.api.tagsafeapplication.com/\"")
+            manifestPlaceholders["appLabelSuffix"] = ""
         }
     }
 
@@ -57,6 +75,12 @@ android {
 }
 
 dependencies {
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("androidx.camera:camera-mlkit-vision:1.4.2")
+    implementation("com.google.mlkit:face-detection:16.1.7")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("androidx.core:core-ktx:1.13.1")

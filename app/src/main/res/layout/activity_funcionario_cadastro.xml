@@ -78,7 +78,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="22dp"
-                        android:text="Preencha os dados e aproxime o crachá do celular."
+                        android:text="Preencha os dados e escolha o cadastro por NFC ou facial."
                         android:textColor="@color/text_secondary"
                         android:textSize="15sp" />
 
@@ -160,67 +160,6 @@
                             android:textSize="16sp" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        app:cardBackgroundColor="@color/turquoise_light"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="@color/turquoise"
-                        app:strokeWidth="1dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="16dp">
-
-                            <TextView
-                                android:id="@+id/textViewNfcStatus"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginBottom="12dp"
-                                android:text="Aproxime o crachá do celular para preencher o NFC."
-                                android:textColor="@color/text_primary"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
-
-                            <com.google.android.material.textfield.TextInputLayout
-                                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:hint="NFC do crachá"
-                                app:boxBackgroundColor="@color/white"
-                                app:boxCornerRadiusBottomEnd="12dp"
-                                app:boxCornerRadiusBottomStart="12dp"
-                                app:boxCornerRadiusTopEnd="12dp"
-                                app:boxCornerRadiusTopStart="12dp"
-                                app:boxStrokeColor="@color/turquoise"
-                                app:startIconDrawable="@drawable/ic_nfc"
-                                app:startIconTint="@color/turquoise">
-
-                                <com.google.android.material.textfield.TextInputEditText
-                                    android:id="@+id/editTextNfcFuncionario"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:enabled="false"
-                                    android:singleLine="true"
-                                    android:textColor="@color/text_primary"
-                                    android:textSize="16sp" />
-                            </com.google.android.material.textfield.TextInputLayout>
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/buttonLimparNfc"
-                                style="@style/Widget.Material3.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="48dp"
-                                android:layout_marginTop="8dp"
-                                android:text="Limpar crachá"
-                                android:textColor="@color/turquoise" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
                     <com.google.android.material.textfield.TextInputLayout
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
@@ -267,6 +206,92 @@
                             android:textSize="16sp" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <CheckBox android:id="@+id/checkAdicionarNfc"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/registration_add_nfc" />
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardNfcCadastro"
+                        android:visibility="gone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        app:cardBackgroundColor="@color/turquoise_light"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="0dp"
+                        app:strokeColor="@color/turquoise"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <TextView
+                                android:id="@+id/textViewNfcStatus"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="12dp"
+                                android:text="Aproxime o crachá do celular para preencher o NFC."
+                                android:textColor="@color/text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="NFC do crachá"
+                                app:boxBackgroundColor="@color/white"
+                                app:boxCornerRadiusBottomEnd="12dp"
+                                app:boxCornerRadiusBottomStart="12dp"
+                                app:boxCornerRadiusTopEnd="12dp"
+                                app:boxCornerRadiusTopStart="12dp"
+                                app:boxStrokeColor="@color/turquoise"
+                                app:startIconDrawable="@drawable/ic_nfc"
+                                app:startIconTint="@color/turquoise">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/editTextNfcFuncionario"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="textCapCharacters"
+                                    android:singleLine="true"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="16sp" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/buttonLimparNfc"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="48dp"
+                                android:layout_marginTop="8dp"
+                                android:text="Limpar crachá"
+                                android:textColor="@color/turquoise" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <CheckBox android:id="@+id/checkCadastroFacial"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/registration_add_face" />
+                    <LinearLayout android:id="@+id/layoutFotoCadastro"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:visibility="gone"
+                        android:layout_marginBottom="12dp">
+                        <TextView android:id="@+id/textViewFotoCadastro"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:text="@string/registration_photo_required" android:textColor="@color/turquoise"
+                            android:accessibilityLiveRegion="polite" android:padding="12dp" />
+                        <com.google.android.material.button.MaterialButton android:id="@+id/buttonFotoCadastro"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:text="@string/registration_capture_face" />
+                    </LinearLayout>
+                    <TextView android:id="@+id/textViewCadastroStatus"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/registration_choose_method" android:textColor="@color/text_secondary"
+                        android:layout_marginBottom="16dp" android:accessibilityLiveRegion="polite" />
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/buttonCadastrarFuncionario"
                         android:layout_width="match_parent"

@@ -69,6 +69,9 @@ class MainActivity : AppCompatActivity() {
         const val ACAO_ABORTAR = "abortar"
     }
 
+    private var metodoPresenca = "nfc"
+    private lateinit var faceAttendance: com.digitalsix.YouSafe.face.FaceAttendanceController
+    private var facialEmEnvio = false
     private lateinit var viewModel: MainViewModel
     private lateinit var sessionManager: SessionManager
     private lateinit var repository: MainRepository
@@ -169,6 +172,16 @@ class MainActivity : AppCompatActivity() {
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
         inicializarViews()
+        faceAttendance = com.digitalsix.YouSafe.face.FaceAttendanceController(
+            this, findViewById(R.id.buttonCaptureFace),
+            textViewListaNFCs, textViewContador, findViewById(R.id.textFacialStatus)
+        ) { busy ->
+            facialEmEnvio = busy
+            buttonConfirmarAula.isEnabled = !busy
+            buttonAbortarAula.isEnabled = !busy
+            buttonVoltarSessoesNFC.isEnabled = !busy
+        }
+        faceAttendance.restore(savedInstanceState)
         configurarTeclado()
         configurarToolbar()
         configurarDropdowns()
@@ -198,7 +211,9 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        mostrarTelaSessoes()
+        val restored = savedInstanceState?.getString("active_face_session")
+            ?.let { sessionManager.getAtividadeEmProgresso(it) }
+        if (restored != null) abrirAtividade(restored) else mostrarTelaSessoes()
     }
 
     // ==========================================
@@ -683,6 +698,8 @@ class MainActivity : AppCompatActivity() {
                 is AcaoState.Loading -> {
                     buttonIniciarAula.isEnabled = false
                     buttonIniciarAula.text = "Iniciando..."
+                    findViewById<View>(R.id.radioPresenceNfc).isEnabled = false
+                    findViewById<View>(R.id.radioPresenceFace).isEnabled = false
                 }
                 is AcaoState.Sucesso -> {
                     val uuid = state.sessaoId ?: return@observe
@@ -695,6 +712,7 @@ class MainActivity : AppCompatActivity() {
                     sessionManager.salvarAtividadeEmProgresso(
                         AtividadeEmProgresso(
                             uuid = uuid,
+                            metodoPresenca = metodoPresenca,
                             inicioMs = aulaInicioMs,
                             unidadeUuid = unidadeUuidSelecionada,
                             unidadeNome = obterNomeUnidadeAtual(),
@@ -716,17 +734,22 @@ class MainActivity : AppCompatActivity() {
                     }
                     buttonIniciarAula.isEnabled = true
                     buttonIniciarAula.text = "Iniciar atividade"
+                    findViewById<View>(R.id.radioPresenceNfc).isEnabled = true
+                    findViewById<View>(R.id.radioPresenceFace).isEnabled = true
                     Toast.makeText(this, state.mensagem, Toast.LENGTH_LONG).show()
                     viewModel.consumirCriarSessaoEstado()
                 }
                 is AcaoState.Idle -> {
                     buttonIniciarAula.isEnabled = true
                     buttonIniciarAula.text = "Iniciar atividade"
+                    findViewById<View>(R.id.radioPresenceNfc).isEnabled = true
+                    findViewById<View>(R.id.radioPresenceFace).isEnabled = true
                 }
             }
         }
 
         viewModel.iniciarTreinamentoSessaoState.observe(this) { state ->
+            atualizarBloqueioAcaoFacial(state)
             when (state) {
                 is AcaoState.Loading -> {
                     buttonConfirmarAula.isEnabled = false
@@ -745,6 +768,7 @@ class MainActivity : AppCompatActivity() {
                         sessionManager.salvarAtividadeEmProgresso(
                             AtividadeEmProgresso(
                                 uuid = uuid,
+                                metodoPresenca = metodoPresenca,
                                 inicioMs = aulaInicioMs,
                                 unidadeUuid = unidadeUuidSelecionada,
                                 unidadeNome = obterNomeUnidadeAtual(),
@@ -763,7 +787,7 @@ class MainActivity : AppCompatActivity() {
                 is AcaoState.Erro -> {
                     val uuid = iniciarTreinamentoEmEnvioUuid
                     iniciarTreinamentoEmEnvioUuid = null
-                    if (uuid != null && deveEnfileirarPorFalhaConexao(state.mensagem)) {
+                    if (uuid != null && metodoPresenca != "facial" && deveEnfileirarPorFalhaConexao(state.mensagem)) {
                         isOnline = false
                         atualizarIndicadorConexao()
                         sessionManager.getAtividadeEmProgresso(uuid)?.let { atividade ->
@@ -785,6 +809,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         viewModel.confirmarSessaoState.observe(this) { state ->
+            atualizarBloqueioAcaoFacial(state)
             when (state) {
                 is AcaoState.Sucesso -> {
                     val uuidFinalizada = sessaoUuid
@@ -810,6 +835,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         viewModel.abortarSessaoState.observe(this) { state ->
+            atualizarBloqueioAcaoFacial(state)
             when (state) {
                 is AcaoState.Sucesso -> {
                     val uuidAbortada = sessaoUuid
@@ -950,6 +976,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun iniciarAula() {
+        metodoPresenca = if (findViewById<RadioButton>(R.id.radioPresenceFace).isChecked) "facial" else "nfc"
+        if (metodoPresenca == "facial") isOnline = NetworkMonitor.isOnline(this)
+        if (metodoPresenca == "facial" && !isOnline) {
+            Toast.makeText(this, "A presença facial precisa de conexão com a internet.", Toast.LENGTH_LONG).show()
+            return
+        }
         val token = sessionManager.getTokenWithBearer() ?: run {
             Toast.makeText(this, "Sessão expirada. Faça login novamente.", Toast.LENGTH_SHORT).show()
             irParaLogin()
@@ -1055,6 +1087,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun iniciarAulaOfflinePorFalhaConexao(): Boolean {
+        if (metodoPresenca == "facial") return false
         val unidadeUuid = unidadeUuidSelecionada ?: return false
         val moduloUuid = moduloSelecionado?.publicId ?: return false
         val atividadeSelecionada =
@@ -1134,7 +1167,17 @@ class MainActivity : AppCompatActivity() {
         return quantidadeApontamentosAtual == 2 && apontamentoAtual == 1
     }
 
+    private fun atualizarBloqueioAcaoFacial(state: AcaoState) {
+        if (metodoPresenca != "facial") return
+        val enabled = state !is AcaoState.Loading && !facialEmEnvio
+        findViewById<View>(R.id.buttonCaptureFace).isEnabled = enabled
+        buttonConfirmarAula.isEnabled = enabled
+        buttonAbortarAula.isEnabled = enabled
+        buttonVoltarSessoesNFC.isEnabled = enabled
+    }
+
     private fun atualizarTextoBotaoConfirmar() {
+        if (facialEmEnvio) return
         if (!::buttonConfirmarAula.isInitialized) return
         buttonConfirmarAula.isEnabled = true
         buttonConfirmarAula.text = if (deveIniciarTreinamentoComBatidaAtual()) {
@@ -1145,6 +1188,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun iniciarTreinamentoComBatidas() {
+        if (facialEmEnvio) return
+        if (metodoPresenca == "facial" && !NetworkMonitor.isOnline(this)) {
+            Toast.makeText(this, "Conecte-se para iniciar o treinamento facial.", Toast.LENGTH_LONG).show()
+            return
+        }
         val uuid = sessaoUuid ?: return
         val atividade = sessionManager.getAtividadeEmProgresso(uuid) ?: return
         if (atividade.offline || !isOnline || !NetworkMonitor.isOnline(this)) {
@@ -1202,6 +1250,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmarAula() {
+        if (facialEmEnvio) return
         val uuid = sessaoUuid ?: return
         val atividade = sessionManager.getAtividadeEmProgresso(uuid)
         if (atividade?.offline == true) {
@@ -1359,6 +1408,7 @@ class MainActivity : AppCompatActivity() {
     // ==========================================
 
     private fun mostrarTelaSessoes() {
+        faceAttendance.deactivate()
         salvarAtividadeAtual()
         layoutLeituraNFC.visibility = View.GONE
         layoutCriacaoAula.visibility = View.GONE
@@ -1525,7 +1575,9 @@ class MainActivity : AppCompatActivity() {
             textSize = 14f
         }
         val participantes = TextView(this).apply {
-            text = if (atividade.quantidadeApontamentos == 2) {
+            text = if (atividade.metodoPresenca == "facial") {
+                "Presença facial • consulte os registros ao abrir a sessão"
+            } else if (atividade.quantidadeApontamentos == 2) {
                 val primeiraBatida = contarParticipantesPorApontamento(atividade, 1)
                 val segundaBatida = contarParticipantesPorApontamento(atividade, 2)
                 "Batida atual: ${atividade.apontamentoAtual} de 2\n" +
@@ -1574,6 +1626,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun abrirAtividade(atividade: AtividadeEmProgresso) {
+        metodoPresenca = atividade.metodoPresenca ?: "nfc"
         sessaoUuid = atividade.uuid
         aulaInicioMs = atividade.inicioMs
         quantidadeApontamentosAtual = atividade.quantidadeApontamentos
@@ -1606,19 +1659,27 @@ class MainActivity : AppCompatActivity() {
         nfcPendente = null
         atualizarListaNFCs()
         atualizarTextoBotaoConfirmar()
+        val facial = metodoPresenca == "facial"
+        findViewById<View>(R.id.cardInstrucaoNfc).visibility = if (facial) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.layoutFacialAttendance).visibility = if (facial) View.VISIBLE else View.GONE
+        if (facial) {
+            desativarNFC()
+            sessaoUuid?.let { faceAttendance.activate(it, apontamentoAtual) }
+        } else faceAttendance.deactivate()
 
         val unidade = empresaSelecionada?.unidades?.find { it.publicId == unidadeUuidSelecionada }
         textViewDescricaoAtual.text = atividade?.moduloNome
             ?: moduloSelecionado?.nome
             ?: sessionManager.getModuloEmProgresso()
             ?: ""
-        textViewUnidadeAtual.text = "Unidade: ${unidade?.unidadeNome ?: atividade?.unidadeNome ?: ""}"
+        textViewUnidadeAtual.text = "Unidade: ${unidade?.unidadeNome ?: atividade?.unidadeNome ?: ""} • ${if (facial) "Facial" else "NFC"}"
 
         ativarNFC()
         iniciarTimer()
     }
 
     private fun mostrarEstadoCriacao() {
+        faceAttendance.deactivate()
         layoutSessoes.visibility = View.GONE
         layoutPendenciasSincronizacao.visibility = View.GONE
         layoutLeituraNFC.visibility = View.GONE
@@ -1799,6 +1860,7 @@ class MainActivity : AppCompatActivity() {
         sessionManager.salvarAtividadeEmProgresso(
             AtividadeEmProgresso(
                 uuid = uuid,
+                metodoPresenca = metodoPresenca,
                 inicioMs = inicioMs,
                 unidadeUuid = unidadeUuidSelecionada ?: existente?.unidadeUuid,
                 unidadeNome = obterNomeUnidadeAtual() ?: existente?.unidadeNome,
@@ -1842,6 +1904,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (::faceAttendance.isInitialized) faceAttendance.save(outState)
+        if (metodoPresenca == "facial" && ::layoutLeituraNFC.isInitialized && layoutLeituraNFC.visibility == View.VISIBLE) {
+            outState.putString("active_face_session", sessaoUuid)
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         salvarAtividadeAtual()
@@ -1873,6 +1943,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun registrarNFC(nfc: String) {
+        if (metodoPresenca != "nfc") return
         if (nfcsRegistrados.contains(nfc) || nfcPendente == nfc || filaNfcsPendentes.contains(nfc)) {
             Toast.makeText(this, "Crachá já registrado", Toast.LENGTH_SHORT).show()
             return
@@ -1924,6 +1995,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun atualizarListaNFCs() {
+        if (metodoPresenca == "facial") return
         if (participantes.isEmpty()) {
             textViewListaNFCs.text = "Nenhum crachá lido ainda."
         } else {
@@ -1937,6 +2009,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun ativarNFC() {
+        if (metodoPresenca != "nfc") return
         val adapter = nfcAdapter ?: return
         val pendingIntent = PendingIntent.getActivity(
             this, 0,

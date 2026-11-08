@@ -576,6 +576,15 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <!-- Botão Iniciar Aula -->
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="Método de presença" android:textSize="16sp" />
+                <RadioGroup android:id="@+id/groupPresenceMethod" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:orientation="horizontal">
+                    <RadioButton android:id="@+id/radioPresenceNfc" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:checked="true" android:text="NFC" />
+                    <RadioButton android:id="@+id/radioPresenceFace" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Facial" />
+                </RadioGroup>
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonIniciarAula"
                     android:layout_width="match_parent"
@@ -652,6 +661,7 @@
 
                 <!-- Card de Instrução NFC -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardInstrucaoNfc"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     app:cardElevation="0dp"
@@ -695,11 +705,21 @@
 
                 </com.google.android.material.card.MaterialCardView>
 
+                <LinearLayout android:id="@+id/layoutFacialAttendance"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:visibility="gone">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="Presença por reconhecimento facial" android:textSize="20sp" />
+                    <TextView android:id="@+id/textFacialStatus" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:text="@string/attendance_live_intro" />
+                    <Button android:id="@+id/buttonCaptureFace" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:text="@string/attendance_start" />
+                </LinearLayout>
                 <!-- Lista de NFCs Lidos -->
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="IDs Registrados"
+                    android:text="Presenças registradas"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"

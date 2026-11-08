@@ -498,7 +498,10 @@ class MainViewModel(private val repository: MainRepository) : ViewModel() {
     }
 
     private fun extrairIdSessao(sessaoCriada: SessaoCriada): String? {
-        return extrairIdSessao(sessaoCriada.body)
+        val publicId = com.digitalsix.YouSafe.face.FaceRules.sessionPublicId(sessaoCriada.body)
+            ?: extrairIdSessaoDeLocation(sessaoCriada.location)
+                ?.takeIf(com.digitalsix.YouSafe.face.FaceRules::isPublicId)
+        return publicId ?: extrairIdSessao(sessaoCriada.body)
             ?: extrairIdSessaoDeLocation(sessaoCriada.location)
     }
 

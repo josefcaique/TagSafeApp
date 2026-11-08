@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="20dp" android:background="@color/background">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/attendance_live_title" android:textSize="25sp" android:textStyle="bold"
+        android:textColor="@color/text_primary" />
+    <TextView android:id="@+id/attendanceContext" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textSize="14sp" android:layout_marginTop="4dp" android:textColor="@color/text_secondary" />
+    <TextView android:id="@+id/attendanceLiveStatus" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/attendance_live_intro" android:textSize="17sp" android:paddingTop="12dp" android:paddingBottom="12dp"
+        android:textColor="@color/text_primary" android:accessibilityLiveRegion="polite" />
+    <FrameLayout android:id="@+id/attendanceCameraContainer" android:layout_width="match_parent"
+        android:layout_height="0dp" android:layout_weight="1">
+        <androidx.camera.view.PreviewView android:id="@+id/attendancePreview"
+            android:layout_width="match_parent" android:layout_height="match_parent" />
+    </FrameLayout>
+    <ProgressBar android:id="@+id/attendanceLiveProgress" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:visibility="gone" />
+    <TextView android:id="@+id/attendanceLastMatch" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:visibility="gone" android:padding="12dp" android:layout_marginTop="8dp"
+        android:background="@color/turquoise_light" android:textColor="@color/text_primary"
+        android:textSize="18sp" android:textStyle="bold" android:accessibilityLiveRegion="polite" />
+    <TextView android:id="@+id/attendanceAttempt" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textSize="13sp" android:textColor="@color/text_secondary" android:paddingTop="4dp" />
+    <com.google.android.material.button.MaterialButton android:id="@+id/attendanceLiveAction"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/attendance_pause" />
+    <com.google.android.material.button.MaterialButton android:id="@+id/attendanceLiveClose"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/attendance_close" />
+</LinearLayout>
